@@ -1,0 +1,256 @@
+import { INestApplication } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import request from 'supertest';
+import {
+  createTestApp,
+  registerShop,
+  resetDatabase,
+} from './test-app';
+
+describe('Shop backend (e2e)', () => {
+  let app: INestApplication;
+  let dataSource: DataSource;
+
+  const auth = (token: string) => ({ Authorization: `Bearer ${token}` });
+  const api = () => request(app.getHttpServer());
+
+  const tomorrow = (): string => {
+    const d = new Date(Date.now() + 86400000 * 2);
+    return d.toISOString().slice(0, 10);
+  };
+
+  beforeAll(async () => {
+    const ctx = await createTestApp();
+    app = ctx.app;
+    dataSource = ctx.dataSource;
+  });
+
+  beforeEach(async () => {
+    await resetDatabase(dataSource);
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  // ---------------------------------------------------------------------------
+  it('isolates shops: A cannot read or mutate B rows', async () => {
+    const a = await registerShop(app, 'alpha');
+    const b = await registerShop(app, 'beta');
+
+    // Shop A creates a phone.
+    const created = await api()
+      .post('/api/phones')
+      .set(auth(a.accessToken))
+      .send({ name: 'iPhone 13', imei: '111111111111', purchasePrice: 1000000 })
+      .expect(201);
+    const phoneId = created.body.id;
+
+    // Shop B cannot read it.
+    await api()
+      .get(`/api/phones/${phoneId}`)
+      .set(auth(b.accessToken))
+      .expect(404);
+
+    // Shop B cannot mutate it.
+    await api()
+      .patch(`/api/phones/${phoneId}`)
+      .set(auth(b.accessToken))
+      .send({ note: 'hacked' })
+      .expect(404);
+
+    // Shop B's list is empty; Shop A sees exactly one.
+    const bList = await api()
+      .get('/api/phones')
+      .set(auth(b.accessToken))
+      .expect(200);
+    expect(bList.body.meta.total).toBe(0);
+
+    const aList = await api()
+      .get('/api/phones')
+      .set(auth(a.accessToken))
+      .expect(200);
+    expect(aList.body.meta.total).toBe(1);
+  });
+
+  // ---------------------------------------------------------------------------
+  it('creates a phone sale with a debt and splits paid/debt amounts', async () => {
+    const a = await registerShop(app, 'debt');
+    const phone = await api()
+      .post('/api/phones')
+      .set(auth(a.accessToken))
+      .send({ name: 'Galaxy S22', imei: '222222222222', purchasePrice: 2000000 })
+      .expect(201);
+
+    const sale = await api()
+      .post('/api/sales/phone')
+      .set(auth(a.accessToken))
+      .send({
+        phoneId: phone.body.id,
+        price: 3000000,
+        debt: {
+          amount: 1000000,
+          dueDate: tomorrow(),
+          customerName: 'Ali',
+          customerPhone: '901234567',
+        },
+      })
+      .expect(201);
+
+    expect(sale.body.totalAmount).toBe(3000000);
+    expect(sale.body.paidAmount).toBe(2000000);
+    expect(sale.body.debtAmount).toBe(1000000);
+    expect(sale.body.debt).not.toBeNull();
+    expect(sale.body.debt.customerPhone).toBe('998901234567');
+    // Profit = (3,000,000 - 2,000,000) * 1 unit.
+    expect(sale.body.profit).toBe(1000000);
+
+    // The phone is now SOLD.
+    const phoneAfter = await api()
+      .get(`/api/phones/${phone.body.id}`)
+      .set(auth(a.accessToken))
+      .expect(200);
+    expect(phoneAfter.body.status).toBe('SOLD');
+
+    // It shows up on the debtors list.
+    const debts = await api()
+      .get('/api/debts?status=OPEN')
+      .set(auth(a.accessToken))
+      .expect(200);
+    expect(debts.body.meta.total).toBe(1);
+    expect(debts.body.data[0].amount).toBe(1000000);
+  });
+
+  it('rejects a debt larger than the sale price', async () => {
+    const a = await registerShop(app, 'debtbig');
+    const phone = await api()
+      .post('/api/phones')
+      .set(auth(a.accessToken))
+      .send({ name: 'Redmi', imei: '333333333333', purchasePrice: 500000 })
+      .expect(201);
+
+    const res = await api()
+      .post('/api/sales/phone')
+      .set(auth(a.accessToken))
+      .send({
+        phoneId: phone.body.id,
+        price: 1000000,
+        debt: {
+          amount: 2000000,
+          dueDate: tomorrow(),
+          customerName: 'Ali',
+          customerPhone: '901234567',
+        },
+      })
+      .expect(400);
+    expect(res.body.code).toBe('DEBT_EXCEEDS_TOTAL');
+  });
+
+  // ---------------------------------------------------------------------------
+  it('rejects over-returning more than was sold', async () => {
+    const a = await registerShop(app, 'ret');
+    const accessory = await api()
+      .post('/api/accessories')
+      .set(auth(a.accessToken))
+      .send({ name: 'Case', purchasePrice: 10000, quantity: 10, salePrice: 25000 })
+      .expect(201);
+
+    const sale = await api()
+      .post('/api/sales/accessory')
+      .set(auth(a.accessToken))
+      .send({ accessoryId: accessory.body.id, quantity: 2 })
+      .expect(201);
+    const saleItemId = sale.body.items[0].id;
+
+    // First return of 1 is fine.
+    await api()
+      .post(`/api/sales/${sale.body.id}/return`)
+      .set(auth(a.accessToken))
+      .send({ saleItemId, quantity: 1, reason: 'defect' })
+      .expect(201);
+
+    // Returning 2 more (only 1 remains) is rejected.
+    const res = await api()
+      .post(`/api/sales/${sale.body.id}/return`)
+      .set(auth(a.accessToken))
+      .send({ saleItemId, quantity: 2, reason: 'defect' })
+      .expect(409);
+    expect(res.body.code).toBe('RETURN_EXCEEDS_SOLD');
+
+    // Stock was restored by exactly 1 (10 - 2 sold + 1 returned = 9).
+    const accAfter = await api()
+      .get(`/api/accessories/${accessory.body.id}`)
+      .set(auth(a.accessToken))
+      .expect(200);
+    expect(accAfter.body.quantity).toBe(9);
+  });
+
+  // ---------------------------------------------------------------------------
+  it('rejects selling more accessories than are in stock', async () => {
+    const a = await registerShop(app, 'stock');
+    const accessory = await api()
+      .post('/api/accessories')
+      .set(auth(a.accessToken))
+      .send({ name: 'Charger', purchasePrice: 20000, quantity: 3, salePrice: 40000 })
+      .expect(201);
+
+    const res = await api()
+      .post('/api/sales/accessory')
+      .set(auth(a.accessToken))
+      .send({ accessoryId: accessory.body.id, quantity: 5 })
+      .expect(409);
+    expect(res.body.code).toBe('INSUFFICIENT_STOCK');
+    expect(res.body.details.available).toBe(3);
+  });
+
+  // ---------------------------------------------------------------------------
+  it('computes the statistics summary from SQL aggregates', async () => {
+    const a = await registerShop(app, 'stats');
+
+    // A phone bought for 2,000,000, sold for 3,000,000 (profit 1,000,000).
+    const phone = await api()
+      .post('/api/phones')
+      .set(auth(a.accessToken))
+      .send({ name: 'Pixel', imei: '444444444444', purchasePrice: 2000000 })
+      .expect(201);
+    await api()
+      .post('/api/sales/phone')
+      .set(auth(a.accessToken))
+      .send({ phoneId: phone.body.id, price: 3000000 })
+      .expect(201);
+
+    // An accessory bought for 10,000, sell 2 @ 25,000 (profit 30,000).
+    const acc = await api()
+      .post('/api/accessories')
+      .set(auth(a.accessToken))
+      .send({ name: 'Cable', purchasePrice: 10000, quantity: 10, salePrice: 25000 })
+      .expect(201);
+    await api()
+      .post('/api/sales/accessory')
+      .set(auth(a.accessToken))
+      .send({ accessoryId: acc.body.id, quantity: 2 })
+      .expect(201);
+
+    // An expense of 100,000.
+    await api()
+      .post('/api/expenses')
+      .set(auth(a.accessToken))
+      .send({ amount: 100000, note: 'Rent' })
+      .expect(201);
+
+    const stats = await api()
+      .get('/api/statistics/summary')
+      .set(auth(a.accessToken))
+      .expect(200);
+
+    expect(stats.body.phones.soldCount).toBe(1);
+    expect(stats.body.phones.soldAmount).toBe(3000000);
+    expect(stats.body.phones.profit).toBe(1000000);
+    expect(stats.body.accessories.soldQty).toBe(2);
+    expect(stats.body.accessories.soldAmount).toBe(50000);
+    expect(stats.body.accessories.profit).toBe(30000);
+    expect(stats.body.expenses.total).toBe(100000);
+    expect(stats.body.totals.grossProfit).toBe(1030000);
+    expect(stats.body.totals.netProfit).toBe(930000);
+  });
+});

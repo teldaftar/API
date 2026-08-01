@@ -1,0 +1,3094 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Register a shop + owner and auto-login",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Log in with login + password",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "operationId": "AuthController_refresh",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenPairDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Rotate refresh token for a new token pair",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "AuthController_logout",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogoutDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "summary": "Revoke a refresh token",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "operationId": "AuthController_me",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Current user + shop",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/password": {
+      "patch": {
+        "operationId": "AuthController_changePassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Change password (revokes all sessions)",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/shop": {
+      "get": {
+        "operationId": "ShopController_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShopResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get own shop settings",
+        "tags": [
+          "shop"
+        ]
+      },
+      "patch": {
+        "operationId": "ShopController_update",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateShopDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ShopResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update shop settings",
+        "tags": [
+          "shop"
+        ]
+      }
+    },
+    "/uploads/image": {
+      "post": {
+        "operationId": "UploadsController_uploadImage",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Upload & resize an image (jpeg|png|webp, max 5MB)",
+        "tags": [
+          "uploads"
+        ]
+      }
+    },
+    "/phones": {
+      "get": {
+        "operationId": "PhonesController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive start date (shop-local)",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive end date (shop-local)",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "IN_STOCK",
+                "SOLD"
+              ]
+            }
+          },
+          {
+            "name": "condition",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "NEW",
+                "USED"
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Match on name or IMEI",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "createdAt",
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "name",
+                "purchasePrice"
+              ]
+            }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "DESC",
+              "type": "string",
+              "enum": [
+                "ASC",
+                "DESC"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List phones (filter/search/paginate)",
+        "tags": [
+          "phones"
+        ]
+      },
+      "post": {
+        "operationId": "PhonesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePhoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create a phone (IN_STOCK)",
+        "tags": [
+          "phones"
+        ]
+      }
+    },
+    "/phones/{id}": {
+      "get": {
+        "operationId": "PhonesController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get one phone",
+        "tags": [
+          "phones"
+        ]
+      },
+      "patch": {
+        "operationId": "PhonesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePhoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update a phone",
+        "tags": [
+          "phones"
+        ]
+      },
+      "delete": {
+        "operationId": "PhonesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Soft-delete a phone (only while IN_STOCK)",
+        "tags": [
+          "phones"
+        ]
+      }
+    },
+    "/phones/{id}/label": {
+      "get": {
+        "operationId": "PhonesController_label",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneLabelDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Spec-card label payload (never contains a price)",
+        "tags": [
+          "phones"
+        ]
+      }
+    },
+    "/accessories": {
+      "get": {
+        "operationId": "AccessoriesController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Match on name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inStock",
+            "required": false,
+            "in": "query",
+            "description": "true → only quantity > 0, false → only quantity = 0",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List accessories",
+        "tags": [
+          "accessories"
+        ]
+      },
+      "post": {
+        "operationId": "AccessoriesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccessoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessoryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create an accessory + first stock entry",
+        "tags": [
+          "accessories"
+        ]
+      }
+    },
+    "/accessories/{id}": {
+      "get": {
+        "operationId": "AccessoriesController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessoryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get one accessory",
+        "tags": [
+          "accessories"
+        ]
+      },
+      "patch": {
+        "operationId": "AccessoriesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAccessoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessoryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update an accessory (not quantity)",
+        "tags": [
+          "accessories"
+        ]
+      },
+      "delete": {
+        "operationId": "AccessoriesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Soft-delete an accessory",
+        "tags": [
+          "accessories"
+        ]
+      }
+    },
+    "/accessories/{id}/stock": {
+      "post": {
+        "operationId": "AccessoriesController_addStock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddStockDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessoryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Add stock (new intake at possibly new cost)",
+        "tags": [
+          "accessories"
+        ]
+      },
+      "get": {
+        "operationId": "AccessoriesController_listStock",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StockEntryResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List stock intake history",
+        "tags": [
+          "accessories"
+        ]
+      }
+    },
+    "/sales": {
+      "get": {
+        "operationId": "SalesController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive start date (shop-local)",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive end date (shop-local)",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PHONE",
+                "ACCESSORY"
+              ]
+            }
+          },
+          {
+            "name": "isDebt",
+            "required": false,
+            "in": "query",
+            "description": "Only sales that carry a debt",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Match sale code or product name/imei",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List sales (type/isDebt/date/search)",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/sales/{id}": {
+      "get": {
+        "operationId": "SalesController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get one sale with items, product snapshot & debt",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/sales/phone": {
+      "post": {
+        "operationId": "SalesController_sellPhone",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SellPhoneDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Sell a phone (optional debt)",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/sales/accessory": {
+      "post": {
+        "operationId": "SalesController_sellAccessory",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SellAccessoryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Sell accessories (optional debt)",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/sales/{id}/return": {
+      "post": {
+        "operationId": "SalesController_createReturn",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReturnDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Return sold units from a sale",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/sales/{id}/returns": {
+      "get": {
+        "operationId": "SalesController_listReturns",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SaleReturnResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List returns for a sale",
+        "tags": [
+          "sales"
+        ]
+      }
+    },
+    "/debts": {
+      "get": {
+        "operationId": "DebtsController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive start date (shop-local)",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive end date (shop-local)",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "PAID",
+                "CANCELLED"
+              ]
+            }
+          },
+          {
+            "name": "overdue",
+            "required": false,
+            "in": "query",
+            "description": "Only OPEN debts past their due date",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Match customer name or phone",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List debts (status/overdue/date/search)",
+        "tags": [
+          "debts"
+        ]
+      }
+    },
+    "/debts/{id}": {
+      "get": {
+        "operationId": "DebtsController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DebtResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get one debt",
+        "tags": [
+          "debts"
+        ]
+      },
+      "patch": {
+        "operationId": "DebtsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDebtDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DebtResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Extend due date / edit note",
+        "tags": [
+          "debts"
+        ]
+      }
+    },
+    "/debts/{id}/pay": {
+      "post": {
+        "operationId": "DebtsController_pay",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayDebtDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DebtResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Settle a debt in full",
+        "tags": [
+          "debts"
+        ]
+      }
+    },
+    "/expenses": {
+      "get": {
+        "operationId": "ExpensesController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive start date (shop-local)",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive end date (shop-local)",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Match on note",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List expenses",
+        "tags": [
+          "expenses"
+        ]
+      },
+      "post": {
+        "operationId": "ExpensesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateExpenseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create an expense",
+        "tags": [
+          "expenses"
+        ]
+      }
+    },
+    "/expenses/{id}": {
+      "patch": {
+        "operationId": "ExpensesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateExpenseDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExpenseResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update an expense",
+        "tags": [
+          "expenses"
+        ]
+      },
+      "delete": {
+        "operationId": "ExpensesController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Soft-delete an expense",
+        "tags": [
+          "expenses"
+        ]
+      }
+    },
+    "/statistics/summary": {
+      "get": {
+        "operationId": "StatisticsController_summary",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive start date (shop-local)",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive end date (shop-local)",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatisticsSummaryDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Aggregated summary (defaults to current month)",
+        "tags": [
+          "statistics"
+        ]
+      }
+    },
+    "/statistics/daily": {
+      "get": {
+        "operationId": "StatisticsController_daily",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive start date (shop-local)",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive end date (shop-local)",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DailyStatRowDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Per-day series for charts (gap-filled)",
+        "tags": [
+          "statistics"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Phone & Accessory Shop API",
+    "description": "Backend for a small retail shop: phones, accessories, sales, debts, expenses and statistics. Multi-tenant — all data scoped by shop.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "access-token": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http",
+        "description": "JWT access token"
+      }
+    },
+    "schemas": {
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "shopName": {
+            "type": "string",
+            "example": "Aziz Mobile",
+            "description": "Do'kon nomi"
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Abdulaziz Karimov"
+          },
+          "login": {
+            "type": "string",
+            "example": "aziz.mobile",
+            "description": "3–32 chars, letters/digits/._- only, globally unique"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "example": "supersecret"
+          },
+          "confirmPassword": {
+            "type": "string",
+            "minLength": 8,
+            "example": "supersecret"
+          },
+          "inviteCode": {
+            "type": "string",
+            "description": "Required only when the server sets INVITE_CODE"
+          }
+        },
+        "required": [
+          "shopName",
+          "fullName",
+          "login",
+          "password",
+          "confirmPassword"
+        ]
+      },
+      "TokenPairDto": {
+        "type": "object",
+        "properties": {
+          "accessToken": {
+            "type": "string"
+          },
+          "refreshToken": {
+            "type": "string"
+          },
+          "expiresIn": {
+            "type": "number",
+            "description": "Access token TTL in seconds"
+          }
+        },
+        "required": [
+          "accessToken",
+          "refreshToken",
+          "expiresIn"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "login": {
+            "type": "string",
+            "example": "aziz.mobile"
+          },
+          "password": {
+            "type": "string",
+            "example": "supersecret"
+          }
+        },
+        "required": [
+          "login",
+          "password"
+        ]
+      },
+      "RefreshDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "The raw refresh token issued at login/refresh"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "LogoutDto": {
+        "type": "object",
+        "properties": {
+          "refreshToken": {
+            "type": "string",
+            "description": "The refresh token to revoke"
+          }
+        },
+        "required": [
+          "refreshToken"
+        ]
+      },
+      "MeUserDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "login": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "fullName",
+          "login",
+          "role",
+          "isActive"
+        ]
+      },
+      "MeShopDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "object",
+            "nullable": true
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "labelFooter": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "address",
+          "phone",
+          "labelFooter"
+        ]
+      },
+      "MeResponseDto": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/MeUserDto"
+          },
+          "shop": {
+            "$ref": "#/components/schemas/MeShopDto"
+          }
+        },
+        "required": [
+          "user",
+          "shop"
+        ]
+      },
+      "ChangePasswordDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string"
+          },
+          "newPassword": {
+            "type": "string",
+            "minLength": 8
+          },
+          "confirmPassword": {
+            "type": "string",
+            "minLength": 8
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword",
+          "confirmPassword"
+        ]
+      },
+      "ShopResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "address": {
+            "type": "object",
+            "nullable": true
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "labelFooter": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "address",
+          "phone",
+          "labelFooter",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpdateShopDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Do'kon nomi — printed on the label"
+          },
+          "address": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "labelFooter": {
+            "type": "string",
+            "description": "Footer text printed at the bottom of the label"
+          }
+        }
+      },
+      "UploadResponseDto": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "example": "/uploads/abc123.webp"
+          },
+          "key": {
+            "type": "string",
+            "example": "abc123.webp"
+          }
+        },
+        "required": [
+          "url",
+          "key"
+        ]
+      },
+      "Object": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreatePhoneDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Samsung Galaxy A54 5G"
+          },
+          "imei": {
+            "type": "string",
+            "example": "356938035643809",
+            "description": "digits only, 10–20 chars"
+          },
+          "purchasePrice": {
+            "type": "number",
+            "example": 2500000,
+            "description": "What the shop paid (UZS)"
+          },
+          "listPrice": {
+            "type": "number",
+            "example": 3000000,
+            "description": "Internal reference only"
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "NEW",
+              "USED"
+            ]
+          },
+          "ramGb": {
+            "type": "number",
+            "example": 8
+          },
+          "storageGb": {
+            "type": "number",
+            "example": 256
+          },
+          "imageUrl": {
+            "type": "string",
+            "example": "/uploads/abc.webp"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "imei",
+          "purchasePrice"
+        ]
+      },
+      "PhoneResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "imei": {
+            "type": "string"
+          },
+          "purchasePrice": {
+            "type": "number"
+          },
+          "listPrice": {
+            "type": "object",
+            "nullable": true
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "NEW",
+              "USED"
+            ],
+            "nullable": true
+          },
+          "ramGb": {
+            "type": "object",
+            "nullable": true
+          },
+          "storageGb": {
+            "type": "object",
+            "nullable": true
+          },
+          "imageUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "note": {
+            "type": "object",
+            "nullable": true
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "IN_STOCK",
+              "SOLD"
+            ]
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "imei",
+          "purchasePrice",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpdatePhoneDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Samsung Galaxy A54 5G"
+          },
+          "imei": {
+            "type": "string",
+            "example": "356938035643809",
+            "description": "digits only, 10–20 chars"
+          },
+          "purchasePrice": {
+            "type": "number",
+            "example": 2500000,
+            "description": "What the shop paid (UZS)"
+          },
+          "listPrice": {
+            "type": "number",
+            "example": 3000000,
+            "description": "Internal reference only"
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "NEW",
+              "USED"
+            ]
+          },
+          "ramGb": {
+            "type": "number",
+            "example": 8
+          },
+          "storageGb": {
+            "type": "number",
+            "example": 256
+          },
+          "imageUrl": {
+            "type": "string",
+            "example": "/uploads/abc.webp"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "PhoneLabelDto": {
+        "type": "object",
+        "properties": {
+          "shopName": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "memory": {
+            "type": "object",
+            "nullable": true,
+            "example": "8 GB / 256 GB",
+            "description": "Omitted when both ram and storage are null"
+          },
+          "condition": {
+            "type": "object",
+            "nullable": true
+          },
+          "imei": {
+            "type": "string"
+          },
+          "labelFooter": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "shopName",
+          "name",
+          "imei"
+        ]
+      },
+      "CreateAccessoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "USB-C kabel 1m"
+          },
+          "purchasePrice": {
+            "type": "number",
+            "example": 15000
+          },
+          "quantity": {
+            "type": "number",
+            "example": 10,
+            "description": "Initial stock quantity"
+          },
+          "salePrice": {
+            "type": "number",
+            "example": 25000
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "purchasePrice",
+          "quantity"
+        ]
+      },
+      "AccessoryResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "purchasePrice": {
+            "type": "number"
+          },
+          "salePrice": {
+            "type": "object",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "imageUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "note": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "purchasePrice",
+          "quantity",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpdateAccessoryDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "USB-C kabel 1m"
+          },
+          "purchasePrice": {
+            "type": "number",
+            "example": 15000
+          },
+          "salePrice": {
+            "type": "number",
+            "example": 25000
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "AddStockDto": {
+        "type": "object",
+        "properties": {
+          "quantity": {
+            "type": "number",
+            "example": 20,
+            "description": "Quantity to add"
+          },
+          "purchasePrice": {
+            "type": "number",
+            "example": 16000,
+            "description": "Cost of this intake"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "quantity",
+          "purchasePrice"
+        ]
+      },
+      "StockEntryResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "purchasePrice": {
+            "type": "number"
+          },
+          "note": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "quantity",
+          "purchasePrice",
+          "createdAt"
+        ]
+      },
+      "SaleProductSnapshotDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "imei": {
+            "type": "object",
+            "nullable": true
+          },
+          "memory": {
+            "type": "object",
+            "nullable": true,
+            "example": "8 GB / 256 GB"
+          },
+          "imageUrl": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "SaleItemResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "itemType": {
+            "type": "string",
+            "enum": [
+              "PHONE",
+              "ACCESSORY"
+            ]
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "unitPrice": {
+            "type": "number"
+          },
+          "costPrice": {
+            "type": "number"
+          },
+          "lineTotal": {
+            "type": "number"
+          },
+          "returnedQuantity": {
+            "type": "number"
+          },
+          "product": {
+            "$ref": "#/components/schemas/SaleProductSnapshotDto"
+          }
+        },
+        "required": [
+          "id",
+          "itemType",
+          "quantity",
+          "unitPrice",
+          "costPrice",
+          "lineTotal",
+          "returnedQuantity",
+          "product"
+        ]
+      },
+      "SaleDebtSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "customerPhone": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "isOverdue": {
+            "type": "boolean"
+          },
+          "daysOverdue": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "customerName",
+          "customerPhone",
+          "amount",
+          "dueDate",
+          "status",
+          "isOverdue",
+          "daysOverdue"
+        ]
+      },
+      "SaleResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "PHONE",
+              "ACCESSORY"
+            ]
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "paidAmount": {
+            "type": "number"
+          },
+          "debtAmount": {
+            "type": "number"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "COMPLETED",
+              "PARTIALLY_RETURNED",
+              "RETURNED"
+            ]
+          },
+          "note": {
+            "type": "object",
+            "nullable": true
+          },
+          "soldAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "profit": {
+            "type": "number",
+            "description": "Profit net of returns: sum (unitPrice - costPrice) * (qty - returnedQty)"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleItemResponseDto"
+            }
+          },
+          "debt": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SaleDebtSummaryDto"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "type",
+          "totalAmount",
+          "paidAmount",
+          "debtAmount",
+          "status",
+          "soldAt",
+          "profit",
+          "items"
+        ]
+      },
+      "DebtInputDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "example": 500000,
+            "description": "Amount still owed"
+          },
+          "dueDate": {
+            "type": "string",
+            "example": "2026-08-15",
+            "description": "Due date (shop-local)"
+          },
+          "customerName": {
+            "type": "string",
+            "example": "Ali Valiyev"
+          },
+          "customerPhone": {
+            "type": "string",
+            "example": "998901234567",
+            "description": "Normalised to 998XXXXXXXXX"
+          }
+        },
+        "required": [
+          "amount",
+          "dueDate",
+          "customerName",
+          "customerPhone"
+        ]
+      },
+      "SellPhoneDto": {
+        "type": "object",
+        "properties": {
+          "phoneId": {
+            "type": "string"
+          },
+          "price": {
+            "type": "number",
+            "example": 3000000,
+            "description": "Negotiated sale price"
+          },
+          "note": {
+            "type": "string"
+          },
+          "debt": {
+            "$ref": "#/components/schemas/DebtInputDto"
+          }
+        },
+        "required": [
+          "phoneId",
+          "price"
+        ]
+      },
+      "SellAccessoryDto": {
+        "type": "object",
+        "properties": {
+          "accessoryId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "example": 2
+          },
+          "unitPrice": {
+            "type": "number",
+            "example": 25000,
+            "description": "Defaults to the accessory salePrice when omitted"
+          },
+          "note": {
+            "type": "string"
+          },
+          "debt": {
+            "$ref": "#/components/schemas/DebtInputDto"
+          }
+        },
+        "required": [
+          "accessoryId",
+          "quantity"
+        ]
+      },
+      "CreateReturnDto": {
+        "type": "object",
+        "properties": {
+          "saleItemId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number",
+            "example": 1,
+            "description": "Units to return"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Refund amount. Defaults to the proportional sold amount; may be lower, never higher."
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "saleItemId",
+          "quantity",
+          "reason"
+        ]
+      },
+      "SaleReturnResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "saleItemId": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "saleItemId",
+          "quantity",
+          "amount",
+          "reason",
+          "createdAt"
+        ]
+      },
+      "DebtResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "saleId": {
+            "type": "string"
+          },
+          "saleCode": {
+            "type": "string"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "customerPhone": {
+            "type": "string"
+          },
+          "productName": {
+            "type": "string",
+            "description": "Comma-joined product names on the sale"
+          },
+          "saleTotalAmount": {
+            "type": "number",
+            "description": "Total amount of the underlying sale"
+          },
+          "paidAmount": {
+            "type": "number",
+            "description": "Amount already paid on the sale"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Amount still owed"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OPEN",
+              "PAID",
+              "CANCELLED"
+            ]
+          },
+          "paidAt": {
+            "type": "object",
+            "nullable": true
+          },
+          "note": {
+            "type": "object",
+            "nullable": true
+          },
+          "isOverdue": {
+            "type": "boolean"
+          },
+          "daysOverdue": {
+            "type": "number"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "saleId",
+          "saleCode",
+          "customerName",
+          "customerPhone",
+          "productName",
+          "saleTotalAmount",
+          "paidAmount",
+          "amount",
+          "dueDate",
+          "status",
+          "isOverdue",
+          "daysOverdue",
+          "createdAt"
+        ]
+      },
+      "PayDebtDto": {
+        "type": "object",
+        "properties": {
+          "paidAt": {
+            "type": "string",
+            "description": "Settlement date; defaults to today (shop-local)"
+          }
+        }
+      },
+      "UpdateDebtDto": {
+        "type": "object",
+        "properties": {
+          "dueDate": {
+            "type": "string",
+            "description": "Extend the due date"
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateExpenseDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "example": 150000
+          },
+          "note": {
+            "type": "string",
+            "example": "Ijara"
+          },
+          "spentAt": {
+            "type": "string",
+            "description": "Defaults to today (shop-local)"
+          }
+        },
+        "required": [
+          "amount",
+          "note"
+        ]
+      },
+      "ExpenseResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "note": {
+            "type": "string"
+          },
+          "spentAt": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "note",
+          "spentAt",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpdateExpenseDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "example": 150000
+          },
+          "note": {
+            "type": "string",
+            "example": "Ijara"
+          },
+          "spentAt": {
+            "type": "string",
+            "description": "Defaults to today (shop-local)"
+          }
+        }
+      },
+      "StatRangeDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "2026-08-01"
+          },
+          "to": {
+            "type": "string",
+            "example": "2026-08-31"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ]
+      },
+      "PhoneStatsDto": {
+        "type": "object",
+        "properties": {
+          "purchasedCount": {
+            "type": "number"
+          },
+          "purchasedAmount": {
+            "type": "number"
+          },
+          "soldCount": {
+            "type": "number"
+          },
+          "soldAmount": {
+            "type": "number"
+          },
+          "soldCostAmount": {
+            "type": "number"
+          },
+          "profit": {
+            "type": "number"
+          },
+          "returnedCount": {
+            "type": "number"
+          },
+          "returnedAmount": {
+            "type": "number"
+          },
+          "soldOnDebtCount": {
+            "type": "number"
+          },
+          "soldOnDebtAmount": {
+            "type": "number"
+          },
+          "inStockCount": {
+            "type": "number",
+            "description": "Current snapshot, NOT range-bound"
+          },
+          "inStockCostAmount": {
+            "type": "number",
+            "description": "Current snapshot, NOT range-bound"
+          }
+        },
+        "required": [
+          "purchasedCount",
+          "purchasedAmount",
+          "soldCount",
+          "soldAmount",
+          "soldCostAmount",
+          "profit",
+          "returnedCount",
+          "returnedAmount",
+          "soldOnDebtCount",
+          "soldOnDebtAmount",
+          "inStockCount",
+          "inStockCostAmount"
+        ]
+      },
+      "AccessoryStatsDto": {
+        "type": "object",
+        "properties": {
+          "purchasedQty": {
+            "type": "number"
+          },
+          "purchasedAmount": {
+            "type": "number"
+          },
+          "soldQty": {
+            "type": "number"
+          },
+          "soldAmount": {
+            "type": "number"
+          },
+          "soldCostAmount": {
+            "type": "number"
+          },
+          "profit": {
+            "type": "number"
+          },
+          "returnedQty": {
+            "type": "number"
+          },
+          "returnedAmount": {
+            "type": "number"
+          },
+          "remainingQty": {
+            "type": "number",
+            "description": "Current snapshot"
+          },
+          "remainingCostAmount": {
+            "type": "number",
+            "description": "Current snapshot"
+          }
+        },
+        "required": [
+          "purchasedQty",
+          "purchasedAmount",
+          "soldQty",
+          "soldAmount",
+          "soldCostAmount",
+          "profit",
+          "returnedQty",
+          "returnedAmount",
+          "remainingQty",
+          "remainingCostAmount"
+        ]
+      },
+      "ExpenseStatsDto": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number"
+          },
+          "total": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "count",
+          "total"
+        ]
+      },
+      "DebtStatsDto": {
+        "type": "object",
+        "properties": {
+          "openCount": {
+            "type": "number"
+          },
+          "openAmount": {
+            "type": "number"
+          },
+          "overdueCount": {
+            "type": "number"
+          },
+          "overdueAmount": {
+            "type": "number"
+          },
+          "createdInRangeCount": {
+            "type": "number"
+          },
+          "createdInRangeAmount": {
+            "type": "number"
+          },
+          "collectedInRange": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "openCount",
+          "openAmount",
+          "overdueCount",
+          "overdueAmount",
+          "createdInRangeCount",
+          "createdInRangeAmount",
+          "collectedInRange"
+        ]
+      },
+      "TotalsStatsDto": {
+        "type": "object",
+        "properties": {
+          "grossProfit": {
+            "type": "number",
+            "description": "phone profit + accessory profit, net of returns"
+          },
+          "netProfit": {
+            "type": "number",
+            "description": "grossProfit - expenses"
+          },
+          "cashIn": {
+            "type": "number",
+            "description": "sale paidAmount + debts settled within range"
+          },
+          "cashOut": {
+            "type": "number",
+            "description": "expenses + phone/accessory purchases within range"
+          }
+        },
+        "required": [
+          "grossProfit",
+          "netProfit",
+          "cashIn",
+          "cashOut"
+        ]
+      },
+      "StatisticsSummaryDto": {
+        "type": "object",
+        "properties": {
+          "range": {
+            "$ref": "#/components/schemas/StatRangeDto"
+          },
+          "phones": {
+            "$ref": "#/components/schemas/PhoneStatsDto"
+          },
+          "accessories": {
+            "$ref": "#/components/schemas/AccessoryStatsDto"
+          },
+          "expenses": {
+            "$ref": "#/components/schemas/ExpenseStatsDto"
+          },
+          "debts": {
+            "$ref": "#/components/schemas/DebtStatsDto"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/TotalsStatsDto"
+          }
+        },
+        "required": [
+          "range",
+          "phones",
+          "accessories",
+          "expenses",
+          "debts",
+          "totals"
+        ]
+      },
+      "DailyStatRowDto": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "example": "2026-08-01"
+          },
+          "salesAmount": {
+            "type": "number"
+          },
+          "profit": {
+            "type": "number"
+          },
+          "expenses": {
+            "type": "number"
+          },
+          "debtCollected": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "salesAmount",
+          "profit",
+          "expenses",
+          "debtCollected"
+        ]
+      }
+    }
+  }
+}
