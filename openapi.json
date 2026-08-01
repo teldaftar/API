@@ -695,6 +695,101 @@
         ]
       }
     },
+    "/accessories/sold": {
+      "get": {
+        "operationId": "AccessoriesController_findSold",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Match on accessory name",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Sold accessories, one aggregated row per accessory",
+        "tags": [
+          "accessories"
+        ]
+      }
+    },
+    "/accessories/{id}/sold": {
+      "get": {
+        "operationId": "AccessoriesController_soldBreakdown",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SoldAccessoryDetailDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Sold breakdown for one accessory (qty sold at each price)",
+        "tags": [
+          "accessories"
+        ]
+      }
+    },
     "/accessories/{id}": {
       "get": {
         "operationId": "AccessoriesController_findOne",
@@ -1996,7 +2091,7 @@
           "imei": {
             "type": "string",
             "example": "356938035643809",
-            "description": "digits only, 10–20 chars"
+            "description": "Optional. Digits only, 10–20 chars when provided."
           },
           "purchasePrice": {
             "type": "number",
@@ -2033,7 +2128,6 @@
         },
         "required": [
           "name",
-          "imei",
           "purchasePrice"
         ]
       },
@@ -2047,14 +2141,26 @@
             "type": "string"
           },
           "imei": {
-            "type": "string"
+            "type": "object",
+            "nullable": true
           },
           "purchasePrice": {
-            "type": "number"
+            "type": "number",
+            "description": "What the shop paid (olingan narx)"
           },
           "listPrice": {
             "type": "object",
             "nullable": true
+          },
+          "salePrice": {
+            "type": "object",
+            "nullable": true,
+            "description": "Actual sold price (sotilgan narx) for a SOLD phone, from its sale; null while IN_STOCK"
+          },
+          "profit": {
+            "type": "object",
+            "nullable": true,
+            "description": "salePrice - purchasePrice for a SOLD phone; null otherwise"
           },
           "condition": {
             "type": "string",
@@ -2099,7 +2205,6 @@
         "required": [
           "id",
           "name",
-          "imei",
           "purchasePrice",
           "status",
           "createdAt",
@@ -2116,7 +2221,7 @@
           "imei": {
             "type": "string",
             "example": "356938035643809",
-            "description": "digits only, 10–20 chars"
+            "description": "Optional. Digits only, 10–20 chars when provided."
           },
           "purchasePrice": {
             "type": "number",
@@ -2172,7 +2277,8 @@
             "nullable": true
           },
           "imei": {
-            "type": "string"
+            "type": "object",
+            "nullable": true
           },
           "labelFooter": {
             "type": "object",
@@ -2181,8 +2287,7 @@
         },
         "required": [
           "shopName",
-          "name",
-          "imei"
+          "name"
         ]
       },
       "CreateAccessoryDto": {
@@ -2261,6 +2366,97 @@
           "quantity",
           "createdAt",
           "updatedAt"
+        ]
+      },
+      "SoldAccessoryPriceLineDto": {
+        "type": "object",
+        "properties": {
+          "unitPrice": {
+            "type": "number",
+            "description": "Sold unit price (sotilgan narx)"
+          },
+          "costPrice": {
+            "type": "number",
+            "description": "Cost snapshot for these units (olingan narx)"
+          },
+          "quantity": {
+            "type": "number",
+            "description": "Units sold at this price, net of returns"
+          },
+          "amount": {
+            "type": "number",
+            "description": "unitPrice * quantity"
+          },
+          "costAmount": {
+            "type": "number",
+            "description": "costPrice * quantity"
+          },
+          "profit": {
+            "type": "number",
+            "description": "amount - costAmount"
+          }
+        },
+        "required": [
+          "unitPrice",
+          "costPrice",
+          "quantity",
+          "amount",
+          "costAmount",
+          "profit"
+        ]
+      },
+      "SoldAccessoryDetailDto": {
+        "type": "object",
+        "properties": {
+          "accessoryId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "currentQuantity": {
+            "type": "number"
+          },
+          "purchasePrice": {
+            "type": "number"
+          },
+          "salePrice": {
+            "type": "object",
+            "nullable": true
+          },
+          "soldQty": {
+            "type": "number"
+          },
+          "soldAmount": {
+            "type": "number"
+          },
+          "soldCostAmount": {
+            "type": "number"
+          },
+          "profit": {
+            "type": "number"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SoldAccessoryPriceLineDto"
+            }
+          }
+        },
+        "required": [
+          "accessoryId",
+          "name",
+          "currentQuantity",
+          "purchasePrice",
+          "soldQty",
+          "soldAmount",
+          "soldCostAmount",
+          "profit",
+          "lines"
         ]
       },
       "UpdateAccessoryDto": {

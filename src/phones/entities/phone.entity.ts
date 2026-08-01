@@ -21,8 +21,8 @@ export class Phone extends SoftDeletableEntity {
   @Column({ type: 'varchar' })
   name: string;
 
-  @Column({ type: 'varchar', length: 20 })
-  imei: string;
+  @Column({ type: 'varchar', length: 20, nullable: true })
+  imei: string | null;
 
   @Column({
     name: 'purchase_price',

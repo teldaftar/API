@@ -21,10 +21,14 @@ export class CreatePhoneDto {
   @MaxLength(200)
   name: string;
 
-  @ApiProperty({ example: '356938035643809', description: 'digits only, 10–20 chars' })
+  @ApiPropertyOptional({
+    example: '356938035643809',
+    description: 'Optional. Digits only, 10–20 chars when provided.',
+  })
+  @IsOptional()
   @IsString()
   @Matches(/^\d{10,20}$/, { message: 'imei must be 10–20 digits' })
-  imei: string;
+  imei?: string;
 
   @ApiProperty({ example: 2500000, description: 'What the shop paid (UZS)' })
   @Type(() => Number)

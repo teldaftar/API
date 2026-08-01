@@ -27,6 +27,11 @@ import {
 } from './dto/accessory-response.dto';
 import { CreateAccessoryDto } from './dto/create-accessory.dto';
 import { QueryAccessoriesDto } from './dto/query-accessories.dto';
+import { QuerySoldAccessoriesDto } from './dto/query-sold-accessories.dto';
+import {
+  SoldAccessoryDetailDto,
+  SoldAccessoryRowDto,
+} from './dto/sold-accessory.dto';
 import { AddStockDto, UpdateAccessoryDto } from './dto/update-accessory.dto';
 
 @ApiTags('accessories')
@@ -57,6 +62,30 @@ export class AccessoriesController {
     @Body() dto: CreateAccessoryDto,
   ): Promise<AccessoryResponseDto> {
     return AccessoryResponseDto.from(await this.service.create(shopId, dto));
+  }
+
+  // NOTE: declared before ':id' so 'sold' isn't captured by the UUID param.
+  @Get('sold')
+  @ApiOperation({
+    summary: 'Sold accessories, one aggregated row per accessory',
+  })
+  findSold(
+    @CurrentShop() shopId: string,
+    @Query() query: QuerySoldAccessoriesDto,
+  ): Promise<PaginatedResult<SoldAccessoryRowDto>> {
+    return this.service.findSold(shopId, query);
+  }
+
+  @Get(':id/sold')
+  @ApiOperation({
+    summary: 'Sold breakdown for one accessory (qty sold at each price)',
+  })
+  @ApiOkResponse({ type: SoldAccessoryDetailDto })
+  soldBreakdown(
+    @CurrentShop() shopId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<SoldAccessoryDetailDto> {
+    return this.service.soldBreakdown(shopId, id);
   }
 
   @Get(':id')

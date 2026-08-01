@@ -105,12 +105,23 @@ describe('Shop backend (e2e)', () => {
     // Profit = (3,000,000 - 2,000,000) * 1 unit.
     expect(sale.body.profit).toBe(1000000);
 
-    // The phone is now SOLD.
+    // The phone is now SOLD, and carries both prices + profit.
     const phoneAfter = await api()
       .get(`/api/phones/${phone.body.id}`)
       .set(auth(a.accessToken))
       .expect(200);
     expect(phoneAfter.body.status).toBe('SOLD');
+    expect(phoneAfter.body.purchasePrice).toBe(2000000);
+    expect(phoneAfter.body.salePrice).toBe(3000000);
+    expect(phoneAfter.body.profit).toBe(1000000);
+
+    // The SOLD list echoes the same enriched prices.
+    const soldList = await api()
+      .get('/api/phones?status=SOLD')
+      .set(auth(a.accessToken))
+      .expect(200);
+    expect(soldList.body.data[0].salePrice).toBe(3000000);
+    expect(soldList.body.data[0].purchasePrice).toBe(2000000);
 
     // It shows up on the debtors list.
     const debts = await api()
@@ -201,6 +212,72 @@ describe('Shop backend (e2e)', () => {
       .expect(409);
     expect(res.body.code).toBe('INSUFFICIENT_STOCK');
     expect(res.body.details.available).toBe(3);
+  });
+
+  // ---------------------------------------------------------------------------
+  it('creates a phone without an IMEI', async () => {
+    const a = await registerShop(app, 'noimei');
+    const created = await api()
+      .post('/api/phones')
+      .set(auth(a.accessToken))
+      .send({ name: 'iPhone 11', purchasePrice: 1500000 })
+      .expect(201);
+    expect(created.body.imei).toBeNull();
+    expect(created.body.status).toBe('IN_STOCK');
+  });
+
+  // ---------------------------------------------------------------------------
+  it('aggregates sold accessories with a per-price breakdown', async () => {
+    const a = await registerShop(app, 'sold');
+    // iPhone 11 case: 30 in stock at cost 5000.
+    const acc = await api()
+      .post('/api/accessories')
+      .set(auth(a.accessToken))
+      .send({ name: 'iPhone 11 chexol', purchasePrice: 5000, quantity: 30 })
+      .expect(201);
+    const accId = acc.body.id;
+
+    // Sell 4 @ 7000 and 10 @ 10000 → 14 sold total.
+    await api()
+      .post('/api/sales/accessory')
+      .set(auth(a.accessToken))
+      .send({ accessoryId: accId, quantity: 4, unitPrice: 7000 })
+      .expect(201);
+    await api()
+      .post('/api/sales/accessory')
+      .set(auth(a.accessToken))
+      .send({ accessoryId: accId, quantity: 10, unitPrice: 10000 })
+      .expect(201);
+
+    // Sold list: one row, 14 units sold.
+    const sold = await api()
+      .get('/api/accessories/sold')
+      .set(auth(a.accessToken))
+      .expect(200);
+    expect(sold.body.meta.total).toBe(1);
+    const row = sold.body.data[0];
+    expect(row.name).toBe('iPhone 11 chexol');
+    expect(row.soldQty).toBe(14);
+    expect(row.soldAmount).toBe(4 * 7000 + 10 * 10000); // 128000
+    expect(row.soldCostAmount).toBe(14 * 5000); // 70000
+    expect(row.profit).toBe(128000 - 70000); // 58000
+    expect(row.currentQuantity).toBe(30 - 14); // 16
+
+    // Breakdown: two price points.
+    const detail = await api()
+      .get(`/api/accessories/${accId}/sold`)
+      .set(auth(a.accessToken))
+      .expect(200);
+    expect(detail.body.soldQty).toBe(14);
+    expect(detail.body.lines).toHaveLength(2);
+    const byPrice = Object.fromEntries(
+      detail.body.lines.map((l: { unitPrice: number; quantity: number }) => [
+        l.unitPrice,
+        l.quantity,
+      ]),
+    );
+    expect(byPrice[7000]).toBe(4);
+    expect(byPrice[10000]).toBe(10);
   });
 
   // ---------------------------------------------------------------------------

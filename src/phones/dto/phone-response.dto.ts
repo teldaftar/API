@@ -4,9 +4,21 @@ import { Phone, PhoneCondition, PhoneStatus } from '../entities/phone.entity';
 export class PhoneResponseDto {
   @ApiProperty() id: string;
   @ApiProperty() name: string;
-  @ApiProperty() imei: string;
-  @ApiProperty() purchasePrice: number;
+  @ApiPropertyOptional({ nullable: true }) imei: string | null;
+  @ApiProperty({ description: 'What the shop paid (olingan narx)' })
+  purchasePrice: number;
   @ApiPropertyOptional({ nullable: true }) listPrice: number | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description:
+      'Actual sold price (sotilgan narx) for a SOLD phone, from its sale; null while IN_STOCK',
+  })
+  salePrice: number | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'salePrice - purchasePrice for a SOLD phone; null otherwise',
+  })
+  profit: number | null;
   @ApiPropertyOptional({ enum: PhoneCondition, nullable: true })
   condition: PhoneCondition | null;
   @ApiPropertyOptional({ nullable: true }) ramGb: number | null;
@@ -17,13 +29,19 @@ export class PhoneResponseDto {
   @ApiProperty() createdAt: Date;
   @ApiProperty() updatedAt: Date;
 
-  static from(phone: Phone): PhoneResponseDto {
+  static from(phone: Phone, salePrice: number | null = null): PhoneResponseDto {
     return {
       id: phone.id,
       name: phone.name,
       imei: phone.imei,
       purchasePrice: phone.purchasePrice,
       listPrice: phone.listPrice,
+      salePrice,
+      profit:
+        salePrice !== null
+          ? Math.round((salePrice - phone.purchasePrice + Number.EPSILON) * 100) /
+            100
+          : null,
       condition: phone.condition,
       ramGb: phone.ramGb,
       storageGb: phone.storageGb,
@@ -46,6 +64,6 @@ export class PhoneLabelDto {
   })
   memory: string | null;
   @ApiPropertyOptional({ nullable: true }) condition: string | null;
-  @ApiProperty() imei: string;
+  @ApiPropertyOptional({ nullable: true }) imei: string | null;
   @ApiPropertyOptional({ nullable: true }) labelFooter: string | null;
 }

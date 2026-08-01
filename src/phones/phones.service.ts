@@ -10,8 +10,9 @@ import {
   localDateEndExclusiveUtc,
 } from '../common';
 import { Shop } from '../shop/entities/shop.entity';
+import { SaleItem, SaleItemType } from '../sales/entities/sale-item.entity';
 import { CreatePhoneDto } from './dto/create-phone.dto';
-import { PhoneLabelDto } from './dto/phone-response.dto';
+import { PhoneLabelDto, PhoneResponseDto } from './dto/phone-response.dto';
 import { QueryPhonesDto } from './dto/query-phones.dto';
 import { UpdatePhoneDto } from './dto/update-phone.dto';
 import { Phone, PhoneStatus } from './entities/phone.entity';
@@ -23,15 +24,64 @@ export class PhonesService {
     private readonly phones: Repository<Phone>,
     @InjectRepository(Shop)
     private readonly shops: Repository<Shop>,
+    @InjectRepository(SaleItem)
+    private readonly saleItems: Repository<SaleItem>,
   ) {}
 
+  /**
+   * Latest actual sold unit price per phone (the phone's most recent sale).
+   * A phone can be sold, returned, and resold — the current SOLD state maps to
+   * the newest sale item, so we take the max sold_at. Batched to avoid N+1.
+   */
+  private async salePriceMap(
+    shopId: string,
+    phoneIds: string[],
+  ): Promise<Map<string, number>> {
+    if (phoneIds.length === 0) return new Map();
+    const rows = await this.saleItems
+      .createQueryBuilder('si')
+      .select('si.phone_id', 'phone_id')
+      .addSelect('si.unit_price', 'unit_price')
+      .innerJoin('sales', 's', 's.id = si.sale_id')
+      .where('si.shop_id = :shopId', { shopId })
+      .andWhere('si.item_type = :type', { type: SaleItemType.PHONE })
+      .andWhere('si.phone_id IN (:...phoneIds)', { phoneIds })
+      .distinctOn(['si.phone_id'])
+      .orderBy('si.phone_id')
+      .addOrderBy('s.sold_at', 'DESC')
+      .getRawMany<{ phone_id: string; unit_price: string }>();
+    return new Map(rows.map((r) => [r.phone_id, parseFloat(r.unit_price)]));
+  }
+
+  /** Map a phone to its response DTO, attaching salePrice when SOLD. */
+  async present(shopId: string, phone: Phone): Promise<PhoneResponseDto> {
+    const [dto] = await this.presentMany(shopId, [phone]);
+    return dto;
+  }
+
+  /** Batch version of {@link present}. */
+  async presentMany(
+    shopId: string,
+    phones: Phone[],
+  ): Promise<PhoneResponseDto[]> {
+    const soldIds = phones
+      .filter((p) => p.status === PhoneStatus.SOLD)
+      .map((p) => p.id);
+    const prices = await this.salePriceMap(shopId, soldIds);
+    return phones.map((p) =>
+      PhoneResponseDto.from(p, prices.get(p.id) ?? null),
+    );
+  }
+
   async create(shopId: string, dto: CreatePhoneDto): Promise<Phone> {
-    await this.assertImeiFree(shopId, dto.imei);
+    if (dto.imei) {
+      await this.assertImeiFree(shopId, dto.imei);
+    }
 
     const phone = this.phones.create({
       shopId,
       name: dto.name.trim(),
-      imei: dto.imei,
+      imei: dto.imei ?? null,
       purchasePrice: dto.purchasePrice,
       listPrice: dto.listPrice ?? null,
       condition: dto.condition ?? null,

@@ -43,7 +43,10 @@ export class PhonesController {
     @Query() query: QueryPhonesDto,
   ): Promise<PaginatedResult<PhoneResponseDto>> {
     const result = await this.phonesService.findAll(shopId, query);
-    return { data: result.data.map(PhoneResponseDto.from), meta: result.meta };
+    return {
+      data: await this.phonesService.presentMany(shopId, result.data),
+      meta: result.meta,
+    };
   }
 
   @Post()
@@ -53,7 +56,10 @@ export class PhonesController {
     @CurrentShop() shopId: string,
     @Body() dto: CreatePhoneDto,
   ): Promise<PhoneResponseDto> {
-    return PhoneResponseDto.from(await this.phonesService.create(shopId, dto));
+    return this.phonesService.present(
+      shopId,
+      await this.phonesService.create(shopId, dto),
+    );
   }
 
   @Get(':id')
@@ -63,7 +69,10 @@ export class PhonesController {
     @CurrentShop() shopId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<PhoneResponseDto> {
-    return PhoneResponseDto.from(await this.phonesService.findOne(shopId, id));
+    return this.phonesService.present(
+      shopId,
+      await this.phonesService.findOne(shopId, id),
+    );
   }
 
   @Patch(':id')
@@ -74,7 +83,8 @@ export class PhonesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdatePhoneDto,
   ): Promise<PhoneResponseDto> {
-    return PhoneResponseDto.from(
+    return this.phonesService.present(
+      shopId,
       await this.phonesService.update(shopId, id, dto),
     );
   }
