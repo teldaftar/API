@@ -20,7 +20,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UploadResponseDto } from './dto/upload-response.dto';
 import { UploadsService } from './uploads.service';
 
-const MAX_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_SIZE_BYTES = 2 * 1024 * 1024;
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 @ApiTags('uploads')
@@ -31,7 +31,7 @@ export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
   @Post('image')
-  @ApiOperation({ summary: 'Upload & resize an image (jpeg|png|webp, max 5MB)' })
+  @ApiOperation({ summary: 'Upload & resize an image (jpeg|png|webp, max 2MB)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {

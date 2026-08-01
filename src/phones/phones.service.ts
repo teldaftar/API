@@ -11,6 +11,7 @@ import {
 } from '../common';
 import { Shop } from '../shop/entities/shop.entity';
 import { SaleItem, SaleItemType } from '../sales/entities/sale-item.entity';
+import { UploadsService } from '../uploads/uploads.service';
 import { CreatePhoneDto } from './dto/create-phone.dto';
 import { PhoneLabelDto, PhoneResponseDto } from './dto/phone-response.dto';
 import { QueryPhonesDto } from './dto/query-phones.dto';
@@ -26,6 +27,7 @@ export class PhonesService {
     private readonly shops: Repository<Shop>,
     @InjectRepository(SaleItem)
     private readonly saleItems: Repository<SaleItem>,
+    private readonly uploads: UploadsService,
   ) {}
 
   /**
@@ -182,6 +184,8 @@ export class PhonesService {
       phone.imei = dto.imei;
     }
 
+    const previousImage = phone.imageUrl;
+
     if (dto.name !== undefined) phone.name = dto.name.trim();
     if (dto.purchasePrice !== undefined) phone.purchasePrice = dto.purchasePrice;
     if (dto.listPrice !== undefined) phone.listPrice = dto.listPrice;
@@ -191,7 +195,14 @@ export class PhonesService {
     if (dto.imageUrl !== undefined) phone.imageUrl = dto.imageUrl;
     if (dto.note !== undefined) phone.note = dto.note;
 
-    return this.phones.save(phone);
+    const saved = await this.phones.save(phone);
+
+    // Image was replaced/cleared → drop the now-orphaned old file.
+    if (previousImage && previousImage !== saved.imageUrl) {
+      await this.uploads.removeByUrl(previousImage);
+    }
+
+    return saved;
   }
 
   async remove(shopId: string, id: string): Promise<void> {
@@ -202,7 +213,17 @@ export class PhonesService {
         'Only in-stock phones can be deleted',
       );
     }
+    const image = phone.imageUrl;
+    // Deletable phones are IN_STOCK, so no sale references them — safe to drop
+    // the image and null the column before soft-removing the row.
+    if (image) {
+      phone.imageUrl = null;
+      await this.phones.save(phone);
+    }
     await this.phones.softRemove(phone);
+    if (image) {
+      await this.uploads.removeByUrl(image);
+    }
   }
 
   async label(shopId: string, id: string): Promise<PhoneLabelDto> {

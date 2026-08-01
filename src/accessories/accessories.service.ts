@@ -6,6 +6,7 @@ import {
   PaginatedResult,
   paginate,
 } from '../common';
+import { UploadsService } from '../uploads/uploads.service';
 import { CreateAccessoryDto } from './dto/create-accessory.dto';
 import { QueryAccessoriesDto } from './dto/query-accessories.dto';
 import { QuerySoldAccessoriesDto } from './dto/query-sold-accessories.dto';
@@ -37,6 +38,7 @@ export class AccessoriesService {
     @InjectRepository(AccessoryStockEntry)
     private readonly stockEntries: Repository<AccessoryStockEntry>,
     private readonly dataSource: DataSource,
+    private readonly uploads: UploadsService,
   ) {}
 
   async create(shopId: string, dto: CreateAccessoryDto): Promise<Accessory> {
@@ -104,18 +106,35 @@ export class AccessoriesService {
     dto: UpdateAccessoryDto,
   ): Promise<Accessory> {
     const accessory = await this.findOne(shopId, id);
+    const previousImage = accessory.imageUrl;
+
     if (dto.name !== undefined) accessory.name = dto.name.trim();
     if (dto.purchasePrice !== undefined)
       accessory.purchasePrice = dto.purchasePrice;
     if (dto.salePrice !== undefined) accessory.salePrice = dto.salePrice;
     if (dto.imageUrl !== undefined) accessory.imageUrl = dto.imageUrl;
     if (dto.note !== undefined) accessory.note = dto.note;
-    return this.accessories.save(accessory);
+
+    const saved = await this.accessories.save(accessory);
+
+    if (previousImage && previousImage !== saved.imageUrl) {
+      await this.uploads.removeByUrl(previousImage);
+    }
+
+    return saved;
   }
 
   async remove(shopId: string, id: string): Promise<void> {
     const accessory = await this.findOne(shopId, id);
+    const image = accessory.imageUrl;
+    if (image) {
+      accessory.imageUrl = null;
+      await this.accessories.save(accessory);
+    }
     await this.accessories.softRemove(accessory);
+    if (image) {
+      await this.uploads.removeByUrl(image);
+    }
   }
 
   /**

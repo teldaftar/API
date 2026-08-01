@@ -278,7 +278,7 @@
             "access-token": []
           }
         ],
-        "summary": "Upload & resize an image (jpeg|png|webp, max 5MB)",
+        "summary": "Upload & resize an image (jpeg|png|webp, max 2MB)",
         "tags": [
           "uploads"
         ]

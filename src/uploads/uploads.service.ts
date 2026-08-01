@@ -49,4 +49,15 @@ export class UploadsService {
 
     return this.storage.save(output, 'webp');
   }
+
+  /**
+   * Delete a stored image given its public URL (e.g. `/uploads/abc.webp`).
+   * No-op for empty or non-local URLs. Never throws — a missing file is fine.
+   */
+  async removeByUrl(url: string | null | undefined): Promise<void> {
+    if (!url) return;
+    const match = /^\/uploads\/(.+)$/.exec(url);
+    if (!match) return; // external/unknown URL — leave it alone
+    await this.storage.remove(match[1]);
+  }
 }

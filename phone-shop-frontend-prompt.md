@@ -59,7 +59,7 @@ Mobile-first. Design for a **390px-wide phone** first, then scale up. On desktop
 - Keep it snappy. Never block interaction behind an animation. Always honor `prefers-reduced-motion`.
 
 ### Core shared components (build these once)
-`AppButton` (variants: primary/secondary/ghost/danger, loading state), `AppInput`, `AppSelect`, `AppTextarea`, `MoneyInput` (formats as you type), `BottomSheet` (mobile) / `AppDialog` (desktop), `ConfirmDialog`, `Toast`, `Card`, `StatTile`, `Badge`/`StatusPill`, `Avatar`, `EmptyState`, `SkeletonBlock`, `Pagination` / infinite-scroll loader, `SearchBar` (debounced), `DateRangePicker`, `ImageUploader` (calls `POST /uploads/image`, shows preview + progress), `Segmented`/`Tabs`, `FAB` (floating action button for "add"), `PullToRefresh` (mobile).
+`AppButton` (variants: primary/secondary/ghost/danger, loading state), `AppInput`, `AppSelect`, `AppTextarea`, `MoneyInput` (formats as you type), `BottomSheet` (mobile) / `AppDialog` (desktop), `ConfirmDialog`, `Toast`, `Card`, `StatTile`, `Badge`/`StatusPill`, `Avatar`, `EmptyState`, `SkeletonBlock`, `Pagination` / infinite-scroll loader, `SearchBar` (debounced), `DateRangePicker`, `ImageUploader` (calls `POST /uploads/image`, shows preview + progress; **validate client-side: jpeg/png/webp, max 2MB** before sending, since the server rejects anything larger), `Segmented`/`Tabs`, `FAB` (floating action button for "add"), `PullToRefresh` (mobile).
 
 ---
 

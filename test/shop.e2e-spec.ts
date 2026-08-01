@@ -1,11 +1,28 @@
 import { INestApplication } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import request from 'supertest';
+import sharp from 'sharp';
 import {
   createTestApp,
   registerShop,
   resetDatabase,
 } from './test-app';
+
+/** A valid tiny PNG buffer for upload tests. */
+async function pngBuffer(): Promise<Buffer> {
+  return sharp({
+    create: { width: 4, height: 4, channels: 3, background: '#4f46e5' },
+  })
+    .png()
+    .toBuffer();
+}
+
+/** Absolute disk path for an uploaded URL like `/uploads/abc.webp`. */
+function uploadPath(url: string): string {
+  return join(process.cwd(), 'uploads', url.replace('/uploads/', ''));
+}
 
 describe('Shop backend (e2e)', () => {
   let app: INestApplication;
@@ -212,6 +229,48 @@ describe('Shop backend (e2e)', () => {
       .expect(409);
     expect(res.body.code).toBe('INSUFFICIENT_STOCK');
     expect(res.body.details.available).toBe(3);
+  });
+
+  // ---------------------------------------------------------------------------
+  it('deletes the image file when a phone is deleted or its image replaced', async () => {
+    const a = await registerShop(app, 'img');
+
+    const up1 = await api()
+      .post('/api/uploads/image')
+      .set(auth(a.accessToken))
+      .attach('file', await pngBuffer(), 'a.png')
+      .expect(201);
+    const url1 = up1.body.url as string;
+    expect(existsSync(uploadPath(url1))).toBe(true);
+
+    const phone = await api()
+      .post('/api/phones')
+      .set(auth(a.accessToken))
+      .send({ name: 'iPhone 12', purchasePrice: 1800000, imageUrl: url1 })
+      .expect(201);
+
+    // Replace the image → old file removed, new file present.
+    const up2 = await api()
+      .post('/api/uploads/image')
+      .set(auth(a.accessToken))
+      .attach('file', await pngBuffer(), 'b.png')
+      .expect(201);
+    const url2 = up2.body.url as string;
+
+    await api()
+      .patch(`/api/phones/${phone.body.id}`)
+      .set(auth(a.accessToken))
+      .send({ imageUrl: url2 })
+      .expect(200);
+    expect(existsSync(uploadPath(url1))).toBe(false);
+    expect(existsSync(uploadPath(url2))).toBe(true);
+
+    // Delete the phone → its current image is removed too.
+    await api()
+      .delete(`/api/phones/${phone.body.id}`)
+      .set(auth(a.accessToken))
+      .expect(204);
+    expect(existsSync(uploadPath(url2))).toBe(false);
   });
 
   // ---------------------------------------------------------------------------
