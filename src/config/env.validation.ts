@@ -20,6 +20,9 @@ export const envValidationSchema = Joi.object({
 
   UPLOADS_DIR: Joi.string().default('./uploads'),
 
+  // Comma-separated list of allowed frontend origins for CORS.
+  CORS_ORIGINS: Joi.string().default('http://localhost:5173'),
+
   THROTTLE_TTL_MS: Joi.number().default(60000),
   THROTTLE_LIMIT: Joi.number().default(5),
 });

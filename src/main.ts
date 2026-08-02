@@ -17,6 +17,17 @@ async function bootstrap(): Promise<void> {
 
   const config = app.get(ConfigService);
 
+  const corsOrigins = config
+    .getOrThrow<string>('CORS_ORIGINS')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  app.enableCors({
+    origin: corsOrigins,
+    credentials: true,
+  });
+
   app.setGlobalPrefix('api', { exclude: ['/'] });
 
   app.useGlobalPipes(
