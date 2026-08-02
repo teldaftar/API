@@ -15,9 +15,10 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { CurrentShop, PaginatedResult } from '../common';
+import { CurrentShop, CurrentUser, PaginatedResult } from '../common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { DebtResponseDto } from './dto/debt-response.dto';
+import { DebtPaymentResponseDto } from './dto/debt-payment-response.dto';
 import { QueryDebtsDto } from './dto/query-debts.dto';
 import { PayDebtDto, UpdateDebtDto } from './dto/update-debt.dto';
 import { DebtsService } from './debts.service';
@@ -49,14 +50,26 @@ export class DebtsController {
   }
 
   @Post(':id/pay')
-  @ApiOperation({ summary: 'Settle a debt in full' })
+  @ApiOperation({ summary: 'Record a debt payment (full or partial)' })
   @ApiOkResponse({ type: DebtResponseDto })
   pay(
     @CurrentShop() shopId: string,
+    @CurrentUser('userId') userId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: PayDebtDto,
   ): Promise<DebtResponseDto> {
-    return this.debtsService.pay(shopId, id, dto);
+    return this.debtsService.pay(shopId, userId, id, dto);
+  }
+
+  @Get(':id/payments')
+  @ApiOperation({ summary: 'List payments made against a debt' })
+  @ApiOkResponse({ type: [DebtPaymentResponseDto] })
+  async listPayments(
+    @CurrentShop() shopId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<DebtPaymentResponseDto[]> {
+    const payments = await this.debtsService.listPayments(shopId, id);
+    return payments.map(DebtPaymentResponseDto.from);
   }
 
   @Patch(':id')

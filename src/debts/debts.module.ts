@@ -8,10 +8,18 @@ import { SaleItem } from '../sales/entities/sale-item.entity';
 import { DebtsController } from './debts.controller';
 import { DebtsService } from './debts.service';
 import { Debt } from './entities/debt.entity';
+import { DebtPayment } from './entities/debt-payment.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Debt, Sale, SaleItem, Phone, Accessory]),
+    TypeOrmModule.forFeature([
+      Debt,
+      DebtPayment,
+      Sale,
+      SaleItem,
+      Phone,
+      Accessory,
+    ]),
     AuthModule,
   ],
   controllers: [DebtsController],

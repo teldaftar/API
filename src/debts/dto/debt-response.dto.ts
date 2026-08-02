@@ -17,8 +17,11 @@ export class DebtResponseDto {
   @ApiProperty({ description: 'Amount already paid on the sale' })
   paidAmount: number;
 
-  @ApiProperty({ description: 'Amount still owed' })
+  @ApiProperty({ description: 'Amount still owed (outstanding balance)' })
   amount: number;
+
+  @ApiProperty({ description: 'Sum of all payments made against this debt' })
+  paidTotal: number;
 
   @ApiProperty() dueDate: string;
   @ApiProperty({ enum: DebtStatus }) status: DebtStatus;

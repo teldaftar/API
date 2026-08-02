@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, In, Repository } from 'typeorm';
+import { Brackets, DataSource, In, Repository } from 'typeorm';
 import {
   BusinessException,
   ErrorCode,
@@ -18,17 +18,21 @@ import { DebtResponseDto } from './dto/debt-response.dto';
 import { QueryDebtsDto } from './dto/query-debts.dto';
 import { PayDebtDto, UpdateDebtDto } from './dto/update-debt.dto';
 import { Debt, DebtStatus } from './entities/debt.entity';
+import { DebtPayment } from './entities/debt-payment.entity';
 
 @Injectable()
 export class DebtsService {
   constructor(
     @InjectRepository(Debt) private readonly debts: Repository<Debt>,
+    @InjectRepository(DebtPayment)
+    private readonly debtPayments: Repository<DebtPayment>,
     @InjectRepository(Sale) private readonly sales: Repository<Sale>,
     @InjectRepository(SaleItem)
     private readonly saleItems: Repository<SaleItem>,
     @InjectRepository(Phone) private readonly phones: Repository<Phone>,
     @InjectRepository(Accessory)
     private readonly accessories: Repository<Accessory>,
+    private readonly dataSource: DataSource,
   ) {}
 
   async findAll(
@@ -86,28 +90,77 @@ export class DebtsService {
     return dto;
   }
 
+  /**
+   * Record a payment (full or partial) against a debt. Reduces the outstanding
+   * balance; once it reaches zero the debt is marked PAID. Every payment is
+   * appended to the debt_payments ledger so the full history stays visible.
+   */
   async pay(
     shopId: string,
+    userId: string,
     id: string,
     dto: PayDebtDto,
   ): Promise<DebtResponseDto> {
+    await this.dataSource.transaction(async (manager) => {
+      const debt = await manager
+        .getRepository(Debt)
+        .createQueryBuilder('debt')
+        .setLock('pessimistic_write')
+        .where('debt.id = :id AND debt.shop_id = :shopId', { id, shopId })
+        .getOne();
+      if (!debt) {
+        throw BusinessException.notFound('Debt not found');
+      }
+      if (debt.status !== DebtStatus.OPEN) {
+        throw BusinessException.conflict(
+          ErrorCode.DEBT_NOT_OPEN,
+          'Only an open debt can accept payments',
+        );
+      }
+
+      const amount = this.round2(dto.amount);
+      if (amount > debt.amount) {
+        throw BusinessException.conflict(
+          ErrorCode.PAYMENT_EXCEEDS_REMAINING,
+          'Payment cannot exceed the remaining balance',
+          { remaining: debt.amount },
+        );
+      }
+
+      const paidAt = dto.paidAt
+        ? new Date(dto.paidAt + 'T00:00:00Z')
+        : new Date();
+
+      await manager.getRepository(DebtPayment).save({
+        shopId,
+        debtId: debt.id,
+        amount,
+        paidAt,
+        note: dto.note ?? null,
+        createdBy: userId,
+      });
+
+      // Reduce the outstanding balance; settle the debt when nothing remains.
+      debt.amount = this.round2(debt.amount - amount);
+      if (debt.amount === 0) {
+        debt.status = DebtStatus.PAID;
+        debt.paidAt = paidAt;
+      }
+      await manager.getRepository(Debt).save(debt);
+    });
+
+    return this.findOne(shopId, id);
+  }
+
+  async listPayments(shopId: string, id: string): Promise<DebtPayment[]> {
     const debt = await this.debts.findOne({ where: { id, shopId } });
     if (!debt) {
       throw BusinessException.notFound('Debt not found');
     }
-    if (debt.status !== DebtStatus.OPEN) {
-      throw BusinessException.conflict(
-        ErrorCode.DEBT_NOT_OPEN,
-        'Only an open debt can be marked paid',
-      );
-    }
-    // Store the settlement instant; default to now.
-    debt.status = DebtStatus.PAID;
-    debt.paidAt = dto.paidAt
-      ? new Date(dto.paidAt + 'T00:00:00Z')
-      : new Date();
-    await this.debts.save(debt);
-    return this.findOne(shopId, id);
+    return this.debtPayments.find({
+      where: { debtId: id, shopId },
+      order: { paidAt: 'DESC', createdAt: 'DESC' },
+    });
   }
 
   async update(
@@ -137,6 +190,22 @@ export class DebtsService {
     const sales = await this.sales.find({
       where: { id: In(saleIds), shopId },
     });
+
+    // Sum of payments per debt, for the paidTotal field.
+    const debtIds = debts.map((d) => d.id);
+    const paymentRows = await this.debtPayments
+      .createQueryBuilder('p')
+      .select('p.debt_id', 'debtId')
+      .addSelect('COALESCE(SUM(p.amount), 0)', 'total')
+      .where('p.shop_id = :shopId AND p.debt_id IN (:...debtIds)', {
+        shopId,
+        debtIds,
+      })
+      .groupBy('p.debt_id')
+      .getRawMany<{ debtId: string; total: string }>();
+    const paidTotalMap = new Map(
+      paymentRows.map((r) => [r.debtId, parseFloat(r.total)]),
+    );
     const items = await this.saleItems.find({
       where: { saleId: In(saleIds), shopId },
     });
@@ -191,6 +260,7 @@ export class DebtsService {
         saleTotalAmount: sale?.totalAmount ?? 0,
         paidAmount: sale?.paidAmount ?? 0,
         amount: debt.amount,
+        paidTotal: this.round2(paidTotalMap.get(debt.id) ?? 0),
         dueDate: debt.dueDate,
         status: debt.status,
         paidAt: debt.paidAt,
@@ -206,5 +276,9 @@ export class DebtsService {
     const from = Date.parse(fromDate + 'T00:00:00Z');
     const to = Date.parse(toDate + 'T00:00:00Z');
     return Math.max(0, Math.round((to - from) / 86400000));
+  }
+
+  private round2(value: number): number {
+    return Math.round((value + Number.EPSILON) * 100) / 100;
   }
 }

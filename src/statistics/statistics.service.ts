@@ -197,9 +197,8 @@ export class StatisticsService {
     const [debtsCollected] = await this.dataSource.query(
       `
       SELECT COALESCE(SUM(amount), 0) AS collected
-      FROM debts
-      WHERE shop_id = $1 AND status = 'PAID'
-        AND paid_at >= $2 AND paid_at < $3
+      FROM debt_payments
+      WHERE shop_id = $1 AND paid_at >= $2 AND paid_at < $3
       `,
       [shopId, range.fromUtc, range.toExclusiveUtc],
     );
@@ -312,9 +311,8 @@ export class StatisticsService {
         `
         SELECT to_char((paid_at + interval '${offset}')::date, 'YYYY-MM-DD') AS d,
                COALESCE(SUM(amount), 0) AS collected
-        FROM debts
-        WHERE shop_id = $1 AND status = 'PAID'
-          AND paid_at >= $2 AND paid_at < $3
+        FROM debt_payments
+        WHERE shop_id = $1 AND paid_at >= $2 AND paid_at < $3
         GROUP BY d
         `,
         [shopId, range.fromUtc, range.toExclusiveUtc],
