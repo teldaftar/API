@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { SaleDebtSummaryDto } from '../../sales/dto/sale-response.dto';
 import { Phone, PhoneCondition, PhoneStatus } from '../entities/phone.entity';
 
 export class PhoneResponseDto {
@@ -26,10 +27,23 @@ export class PhoneResponseDto {
   @ApiPropertyOptional({ nullable: true }) imageUrl: string | null;
   @ApiPropertyOptional({ nullable: true }) note: string | null;
   @ApiProperty({ enum: PhoneStatus }) status: PhoneStatus;
+
+  @ApiPropertyOptional({
+    type: SaleDebtSummaryDto,
+    nullable: true,
+    description:
+      'Debt info when the phone was sold on debt; null otherwise. Shows original amount, remaining balance and the payment history.',
+  })
+  debt: SaleDebtSummaryDto | null;
+
   @ApiProperty() createdAt: Date;
   @ApiProperty() updatedAt: Date;
 
-  static from(phone: Phone, salePrice: number | null = null): PhoneResponseDto {
+  static from(
+    phone: Phone,
+    salePrice: number | null = null,
+    debt: SaleDebtSummaryDto | null = null,
+  ): PhoneResponseDto {
     return {
       id: phone.id,
       name: phone.name,
@@ -48,6 +62,7 @@ export class PhoneResponseDto {
       imageUrl: phone.imageUrl,
       note: phone.note,
       status: phone.status,
+      debt,
       createdAt: phone.createdAt,
       updatedAt: phone.updatedAt,
     };

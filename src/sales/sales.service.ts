@@ -14,12 +14,10 @@ import {
 import { Accessory } from '../accessories/entities/accessory.entity';
 import { Debt, DebtStatus } from '../debts/entities/debt.entity';
 import { Phone, PhoneStatus } from '../phones/entities/phone.entity';
+import { DebtPayment } from '../debts/entities/debt-payment.entity';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { DebtInputDto } from './dto/debt-input.dto';
-import {
-  SaleDebtSummaryDto,
-  SaleResponseDto,
-} from './dto/sale-response.dto';
+import { buildDebtSummary, SaleResponseDto } from './dto/sale-response.dto';
 import { QuerySalesDto } from './dto/query-sales.dto';
 import { SellAccessoryDto } from './dto/sell-accessory.dto';
 import { SellPhoneDto } from './dto/sell-phone.dto';
@@ -37,6 +35,8 @@ export class SalesService {
     @InjectRepository(SaleReturn)
     private readonly saleReturns: Repository<SaleReturn>,
     @InjectRepository(Debt) private readonly debts: Repository<Debt>,
+    @InjectRepository(DebtPayment)
+    private readonly debtPayments: Repository<DebtPayment>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -418,6 +418,35 @@ export class SalesService {
       where: { saleId: In(ids), shopId },
     });
 
+    // Refunds per sale item, so profit can account for amounts retained on
+    // partial returns (customer paid X, got refunded less — the shop keeps
+    // the difference while the goods return to stock).
+    const returns = await this.saleReturns.find({
+      where: { saleId: In(ids), shopId },
+    });
+    const refundByItem = new Map<string, number>();
+    for (const r of returns) {
+      refundByItem.set(
+        r.saleItemId,
+        (refundByItem.get(r.saleItemId) ?? 0) + r.amount,
+      );
+    }
+
+    // Payment ledger for those debts, grouped by debt id (newest first).
+    const debtIds = debts.map((d) => d.id);
+    const payments = debtIds.length
+      ? await this.debtPayments.find({
+          where: { debtId: In(debtIds), shopId },
+          order: { paidAt: 'DESC', createdAt: 'DESC' },
+        })
+      : [];
+    const paymentsByDebt = new Map<string, DebtPayment[]>();
+    for (const p of payments) {
+      const list = paymentsByDebt.get(p.debtId) ?? [];
+      list.push(p);
+      paymentsByDebt.set(p.debtId, list);
+    }
+
     const phoneIds = items
       .filter((i) => i.phoneId)
       .map((i) => i.phoneId as string);
@@ -461,6 +490,8 @@ export class SalesService {
           phoneMap,
           accMap,
           debtMap.get(sale.id) ?? null,
+          paymentsByDebt,
+          refundByItem,
           today,
         ),
       );
@@ -472,12 +503,19 @@ export class SalesService {
     phoneMap: Map<string, Phone>,
     accMap: Map<string, Accessory>,
     debt: Debt | null,
+    paymentsByDebt: Map<string, DebtPayment[]>,
+    refundByItem: Map<string, number>,
     today: string,
   ): SaleResponseDto {
     let profit = 0;
     const itemDtos = items.map((item) => {
       const net = item.quantity - item.returnedQuantity;
-      profit += (item.unitPrice - item.costPrice) * net;
+      // Profit on units still sold, plus any amount retained on returned units
+      // (what the customer paid for them minus what was refunded).
+      const retainedOnReturns =
+        item.unitPrice * item.returnedQuantity -
+        (refundByItem.get(item.id) ?? 0);
+      profit += (item.unitPrice - item.costPrice) * net + retainedOnReturns;
 
       let snapshot;
       if (item.itemType === SaleItemType.PHONE && item.phoneId) {
@@ -524,24 +562,20 @@ export class SalesService {
       soldAt: sale.soldAt,
       profit: this.round2(profit),
       items: itemDtos,
-      debt: debt ? this.toDebtSummary(debt, today) : null,
-    };
-  }
-
-  private toDebtSummary(debt: Debt, today: string): SaleDebtSummaryDto {
-    const isOverdue = debt.status === DebtStatus.OPEN && debt.dueDate < today;
-    const daysOverdue = isOverdue
-      ? this.daysBetween(debt.dueDate, today)
-      : 0;
-    return {
-      id: debt.id,
-      customerName: debt.customerName,
-      customerPhone: debt.customerPhone,
-      amount: debt.amount,
-      dueDate: debt.dueDate,
-      status: debt.status,
-      isOverdue,
-      daysOverdue,
+      debt: debt
+        ? buildDebtSummary({
+            debtId: debt.id,
+            saleId: sale.id,
+            customerName: debt.customerName,
+            customerPhone: debt.customerPhone,
+            originalAmount: sale.debtAmount,
+            remaining: debt.amount,
+            dueDate: debt.dueDate,
+            status: debt.status,
+            today,
+            payments: paymentsByDebt.get(debt.id) ?? [],
+          })
+        : null,
     };
   }
 
@@ -646,11 +680,5 @@ export class SalesService {
 
   private round2(value: number): number {
     return Math.round((value + Number.EPSILON) * 100) / 100;
-  }
-
-  private daysBetween(fromDate: string, toDate: string): number {
-    const from = Date.parse(fromDate + 'T00:00:00Z');
-    const to = Date.parse(toDate + 'T00:00:00Z');
-    return Math.max(0, Math.round((to - from) / 86400000));
   }
 }

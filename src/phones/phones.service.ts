@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, Repository } from 'typeorm';
+import { Brackets, In, Repository } from 'typeorm';
 import {
   BusinessException,
   ErrorCode,
@@ -11,6 +11,14 @@ import {
 } from '../common';
 import { Shop } from '../shop/entities/shop.entity';
 import { SaleItem, SaleItemType } from '../sales/entities/sale-item.entity';
+import { Sale } from '../sales/entities/sale.entity';
+import { Debt } from '../debts/entities/debt.entity';
+import { DebtPayment } from '../debts/entities/debt-payment.entity';
+import {
+  buildDebtSummary,
+  SaleDebtSummaryDto,
+} from '../sales/dto/sale-response.dto';
+import { todayLocalDateString } from '../common';
 import { UploadsService } from '../uploads/uploads.service';
 import { CreatePhoneDto } from './dto/create-phone.dto';
 import { PhoneLabelDto, PhoneResponseDto } from './dto/phone-response.dto';
@@ -27,23 +35,30 @@ export class PhonesService {
     private readonly shops: Repository<Shop>,
     @InjectRepository(SaleItem)
     private readonly saleItems: Repository<SaleItem>,
+    @InjectRepository(Sale)
+    private readonly sales: Repository<Sale>,
+    @InjectRepository(Debt)
+    private readonly debts: Repository<Debt>,
+    @InjectRepository(DebtPayment)
+    private readonly debtPayments: Repository<DebtPayment>,
     private readonly uploads: UploadsService,
   ) {}
 
   /**
-   * Latest actual sold unit price per phone (the phone's most recent sale).
-   * A phone can be sold, returned, and resold — the current SOLD state maps to
-   * the newest sale item, so we take the max sold_at. Batched to avoid N+1.
+   * Latest sale (price + sale id) per phone — the phone's most recent sale.
+   * A phone can be sold, returned, and resold, so the current SOLD state maps
+   * to the newest sale item (max sold_at). Batched to avoid N+1.
    */
-  private async salePriceMap(
+  private async latestSaleMap(
     shopId: string,
     phoneIds: string[],
-  ): Promise<Map<string, number>> {
+  ): Promise<Map<string, { unitPrice: number; saleId: string }>> {
     if (phoneIds.length === 0) return new Map();
     const rows = await this.saleItems
       .createQueryBuilder('si')
       .select('si.phone_id', 'phone_id')
       .addSelect('si.unit_price', 'unit_price')
+      .addSelect('si.sale_id', 'sale_id')
       .innerJoin('sales', 's', 's.id = si.sale_id')
       .where('si.shop_id = :shopId', { shopId })
       .andWhere('si.item_type = :type', { type: SaleItemType.PHONE })
@@ -51,11 +66,75 @@ export class PhonesService {
       .distinctOn(['si.phone_id'])
       .orderBy('si.phone_id')
       .addOrderBy('s.sold_at', 'DESC')
-      .getRawMany<{ phone_id: string; unit_price: string }>();
-    return new Map(rows.map((r) => [r.phone_id, parseFloat(r.unit_price)]));
+      .getRawMany<{ phone_id: string; unit_price: string; sale_id: string }>();
+    return new Map(
+      rows.map((r) => [
+        r.phone_id,
+        { unitPrice: parseFloat(r.unit_price), saleId: r.sale_id },
+      ]),
+    );
   }
 
-  /** Map a phone to its response DTO, attaching salePrice when SOLD. */
+  /**
+   * Debt summary (with payment history) keyed by phone id, for phones whose
+   * latest sale was on debt. Batched: one debts query + one payments query.
+   */
+  private async debtByPhone(
+    shopId: string,
+    latestSales: Map<string, { unitPrice: number; saleId: string }>,
+  ): Promise<Map<string, SaleDebtSummaryDto>> {
+    const result = new Map<string, SaleDebtSummaryDto>();
+    if (latestSales.size === 0) return result;
+
+    const saleIds = [...latestSales.values()].map((v) => v.saleId);
+    const sales = await this.sales.find({
+      where: { id: In(saleIds), shopId },
+    });
+    const debts = await this.debts.find({
+      where: { saleId: In(saleIds), shopId },
+    });
+    if (debts.length === 0) return result;
+
+    const saleMap = new Map(sales.map((s) => [s.id, s]));
+    const debtBySale = new Map(debts.map((d) => [d.saleId, d]));
+
+    const debtIds = debts.map((d) => d.id);
+    const payments = await this.debtPayments.find({
+      where: { debtId: In(debtIds), shopId },
+      order: { paidAt: 'DESC', createdAt: 'DESC' },
+    });
+    const paymentsByDebt = new Map<string, DebtPayment[]>();
+    for (const p of payments) {
+      const list = paymentsByDebt.get(p.debtId) ?? [];
+      list.push(p);
+      paymentsByDebt.set(p.debtId, list);
+    }
+
+    const today = todayLocalDateString();
+    for (const [phoneId, { saleId }] of latestSales) {
+      const debt = debtBySale.get(saleId);
+      if (!debt) continue;
+      const sale = saleMap.get(saleId);
+      result.set(
+        phoneId,
+        buildDebtSummary({
+          debtId: debt.id,
+          saleId,
+          customerName: debt.customerName,
+          customerPhone: debt.customerPhone,
+          originalAmount: sale?.debtAmount ?? debt.amount,
+          remaining: debt.amount,
+          dueDate: debt.dueDate,
+          status: debt.status,
+          today,
+          payments: paymentsByDebt.get(debt.id) ?? [],
+        }),
+      );
+    }
+    return result;
+  }
+
+  /** Map a phone to its response DTO, attaching salePrice + debt when SOLD. */
   async present(shopId: string, phone: Phone): Promise<PhoneResponseDto> {
     const [dto] = await this.presentMany(shopId, [phone]);
     return dto;
@@ -69,9 +148,14 @@ export class PhonesService {
     const soldIds = phones
       .filter((p) => p.status === PhoneStatus.SOLD)
       .map((p) => p.id);
-    const prices = await this.salePriceMap(shopId, soldIds);
+    const latestSales = await this.latestSaleMap(shopId, soldIds);
+    const debtByPhone = await this.debtByPhone(shopId, latestSales);
     return phones.map((p) =>
-      PhoneResponseDto.from(p, prices.get(p.id) ?? null),
+      PhoneResponseDto.from(
+        p,
+        latestSales.get(p.id)?.unitPrice ?? null,
+        debtByPhone.get(p.id) ?? null,
+      ),
     );
   }
 

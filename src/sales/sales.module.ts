@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { Accessory } from '../accessories/entities/accessory.entity';
 import { Debt } from '../debts/entities/debt.entity';
+import { DebtPayment } from '../debts/entities/debt-payment.entity';
 import { Phone } from '../phones/entities/phone.entity';
 import { SaleCounter } from './entities/sale-counter.entity';
 import { SaleItem } from './entities/sale-item.entity';
@@ -19,6 +20,7 @@ import { SalesService } from './sales.service';
       SaleReturn,
       SaleCounter,
       Debt,
+      DebtPayment,
       Phone,
       Accessory,
     ]),

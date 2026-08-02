@@ -92,7 +92,7 @@ export class StatisticsService {
 
     const [phonesDebt] = await this.dataSource.query(
       `
-      SELECT COUNT(*) AS cnt, COALESCE(SUM(d.amount), 0) AS amount
+      SELECT COUNT(*) AS cnt, COALESCE(SUM(s.debt_amount), 0) AS amount
       FROM debts d
       JOIN sales s ON s.id = d.sale_id
       WHERE d.shop_id = $1 AND s.type = 'PHONE'
@@ -187,9 +187,10 @@ export class StatisticsService {
 
     const [debtsCreated] = await this.dataSource.query(
       `
-      SELECT COUNT(*) AS cnt, COALESCE(SUM(amount), 0) AS amount
-      FROM debts
-      WHERE shop_id = $1 AND created_at >= $2 AND created_at < $3
+      SELECT COUNT(*) AS cnt, COALESCE(SUM(s.debt_amount), 0) AS amount
+      FROM debts d
+      JOIN sales s ON s.id = d.sale_id
+      WHERE d.shop_id = $1 AND d.created_at >= $2 AND d.created_at < $3
       `,
       [shopId, range.fromUtc, range.toExclusiveUtc],
     );
@@ -212,8 +213,59 @@ export class StatisticsService {
       [shopId, range.fromUtc, range.toExclusiveUtc],
     );
 
-    const phoneProfit = num(phones.sold_amount) - num(phones.sold_cost_amount);
-    const accProfit = num(acc.sold_amount) - num(acc.sold_cost_amount);
+    // Cash refunded to customers on returns (by return date) — a cash outflow.
+    const [refundsPaid] = await this.dataSource.query(
+      `
+      SELECT COALESCE(SUM(amount), 0) AS refunded
+      FROM sale_returns
+      WHERE shop_id = $1 AND created_at >= $2 AND created_at < $3
+      `,
+      [shopId, range.fromUtc, range.toExclusiveUtc],
+    );
+
+    // Amount retained on returned units (customer paid unit_price, was refunded
+    // less) is real profit — the goods came back to stock. Attributed to the
+    // sale period, consistent with the per-sale profit in the sales history.
+    const [phonesRetained] = await this.dataSource.query(
+      `
+      SELECT COALESCE(SUM(si.unit_price * si.returned_quantity), 0)
+             - COALESCE(SUM(rr.refunded), 0) AS retained
+      FROM sale_items si
+      JOIN sales s ON s.id = si.sale_id
+      LEFT JOIN (
+        SELECT sale_item_id, SUM(amount) AS refunded
+        FROM sale_returns WHERE shop_id = $1 GROUP BY sale_item_id
+      ) rr ON rr.sale_item_id = si.id
+      WHERE si.shop_id = $1 AND si.item_type = 'PHONE'
+        AND s.sold_at >= $2 AND s.sold_at < $3
+      `,
+      [shopId, range.fromUtc, range.toExclusiveUtc],
+    );
+
+    const [accRetained] = await this.dataSource.query(
+      `
+      SELECT COALESCE(SUM(si.unit_price * si.returned_quantity), 0)
+             - COALESCE(SUM(rr.refunded), 0) AS retained
+      FROM sale_items si
+      JOIN sales s ON s.id = si.sale_id
+      LEFT JOIN (
+        SELECT sale_item_id, SUM(amount) AS refunded
+        FROM sale_returns WHERE shop_id = $1 GROUP BY sale_item_id
+      ) rr ON rr.sale_item_id = si.id
+      WHERE si.shop_id = $1 AND si.item_type = 'ACCESSORY'
+        AND s.sold_at >= $2 AND s.sold_at < $3
+      `,
+      [shopId, range.fromUtc, range.toExclusiveUtc],
+    );
+
+    const phoneProfit =
+      num(phones.sold_amount) -
+      num(phones.sold_cost_amount) +
+      num(phonesRetained.retained);
+    const accProfit =
+      num(acc.sold_amount) -
+      num(acc.sold_cost_amount) +
+      num(accRetained.retained);
     const grossProfit = phoneProfit + accProfit;
     const expensesTotal = num(expenses.total);
     const purchasesTotal =
@@ -266,7 +318,9 @@ export class StatisticsService {
         cashIn: this.round2(
           num(salesPaid.paid) + num(debtsCollected.collected),
         ),
-        cashOut: this.round2(expensesTotal + purchasesTotal),
+        cashOut: this.round2(
+          expensesTotal + purchasesTotal + num(refundsPaid.refunded),
+        ),
       },
     };
   }
@@ -284,9 +338,16 @@ export class StatisticsService {
         `
         SELECT to_char((s.sold_at + interval '${offset}')::date, 'YYYY-MM-DD') AS d,
                COALESCE(SUM(si.unit_price * (si.quantity - si.returned_quantity)), 0) AS amount,
-               COALESCE(SUM((si.unit_price - si.cost_price) * (si.quantity - si.returned_quantity)), 0) AS profit
+               COALESCE(SUM(
+                 (si.unit_price - si.cost_price) * (si.quantity - si.returned_quantity)
+                 + (si.unit_price * si.returned_quantity - COALESCE(rr.refunded, 0))
+               ), 0) AS profit
         FROM sales s
         JOIN sale_items si ON si.sale_id = s.id
+        LEFT JOIN (
+          SELECT sale_item_id, SUM(amount) AS refunded
+          FROM sale_returns WHERE shop_id = $1 GROUP BY sale_item_id
+        ) rr ON rr.sale_item_id = si.id
         WHERE s.shop_id = $1 AND s.sold_at >= $2 AND s.sold_at < $3
         GROUP BY d
         `,
