@@ -50,6 +50,11 @@ export class PhoneResponseDto {
     description: 'Whether the phone has its original box (null = unknown).',
   })
   hasBox: boolean | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Whether the phone comes with its charger (null = unknown).',
+  })
+  hasCharger: boolean | null;
   @ApiPropertyOptional({ nullable: true }) ramGb: number | null;
   @ApiPropertyOptional({ nullable: true }) storageGb: number | null;
   @ApiPropertyOptional({ nullable: true }) imageUrl: string | null;
@@ -90,6 +95,7 @@ export class PhoneResponseDto {
       condition: phone.condition,
       usedGrade: phone.usedGrade,
       hasBox: phone.hasBox,
+      hasCharger: phone.hasCharger,
       ramGb: phone.ramGb,
       storageGb: phone.storageGb,
       imageUrl: phone.imageUrl,

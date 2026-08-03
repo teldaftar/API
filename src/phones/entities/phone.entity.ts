@@ -75,6 +75,10 @@ export class Phone extends SoftDeletableEntity {
   @Column({ name: 'has_box', type: 'boolean', nullable: true })
   hasBox: boolean | null;
 
+  /** Whether the phone comes with its charger. Independent of condition/box. */
+  @Column({ name: 'has_charger', type: 'boolean', nullable: true })
+  hasCharger: boolean | null;
+
   @Column({ name: 'ram_gb', type: 'int', nullable: true })
   ramGb: number | null;
 

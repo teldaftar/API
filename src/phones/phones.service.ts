@@ -184,6 +184,7 @@ export class PhonesService {
       condition,
       usedGrade,
       hasBox: dto.hasBox ?? null,
+      hasCharger: dto.hasCharger ?? null,
       ramGb: dto.ramGb ?? null,
       storageGb: dto.storageGb ?? null,
       imageUrl: dto.imageUrl ?? null,
@@ -306,6 +307,7 @@ export class PhonesService {
       phone.usedGrade = null;
     }
     if (dto.hasBox !== undefined) phone.hasBox = dto.hasBox;
+    if (dto.hasCharger !== undefined) phone.hasCharger = dto.hasCharger;
     if (dto.ramGb !== undefined) phone.ramGb = dto.ramGb;
     if (dto.storageGb !== undefined) phone.storageGb = dto.storageGb;
     if (dto.imageUrl !== undefined) phone.imageUrl = dto.imageUrl;

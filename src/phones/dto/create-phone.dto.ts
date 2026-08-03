@@ -88,6 +88,15 @@ export class CreatePhoneDto {
   @IsBoolean()
   hasBox?: boolean;
 
+  @ApiPropertyOptional({
+    example: true,
+    description:
+      'Whether the phone comes with its charger. Independent of condition and box.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  hasCharger?: boolean;
+
   @ApiPropertyOptional({ example: 8 })
   @IsOptional()
   @Type(() => Number)
