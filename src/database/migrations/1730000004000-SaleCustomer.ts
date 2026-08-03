@@ -8,11 +8,13 @@ export class SaleCustomer1730000004000 implements MigrationInterface {
   name = 'SaleCustomer1730000004000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // IF NOT EXISTS: an earlier build shipped these columns under a different
+    // migration name, so they may already be present on some databases.
     await queryRunner.query(
-      `ALTER TABLE "sales" ADD COLUMN "customer_name" character varying`,
+      `ALTER TABLE "sales" ADD COLUMN IF NOT EXISTS "customer_name" character varying`,
     );
     await queryRunner.query(
-      `ALTER TABLE "sales" ADD COLUMN "customer_phone" character varying`,
+      `ALTER TABLE "sales" ADD COLUMN IF NOT EXISTS "customer_phone" character varying`,
     );
   }
 

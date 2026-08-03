@@ -9,11 +9,18 @@ export class PhoneUsedGrade1730000006000 implements MigrationInterface {
   name = 'PhoneUsedGrade1730000006000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // Idempotent guards so a partial/renamed migration history can't collide.
+    await queryRunner.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_type WHERE typname = 'phones_used_grade_enum'
+        ) THEN
+          CREATE TYPE "phones_used_grade_enum" AS ENUM ('GOOD', 'MEDIUM', 'BAD');
+        END IF;
+      END $$;
+    `);
     await queryRunner.query(
-      `CREATE TYPE "phones_used_grade_enum" AS ENUM ('GOOD', 'MEDIUM', 'BAD')`,
-    );
-    await queryRunner.query(
-      `ALTER TABLE "phones" ADD COLUMN "used_grade" "phones_used_grade_enum"`,
+      `ALTER TABLE "phones" ADD COLUMN IF NOT EXISTS "used_grade" "phones_used_grade_enum"`,
     );
   }
 
