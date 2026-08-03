@@ -56,6 +56,10 @@ export class Phone extends SoftDeletableEntity {
   @Column({ type: 'enum', enum: PhoneCondition, nullable: true })
   condition: PhoneCondition | null;
 
+  /** Whether the phone still has its original box. Independent of condition. */
+  @Column({ name: 'has_box', type: 'boolean', nullable: true })
+  hasBox: boolean | null;
+
   @Column({ name: 'ram_gb', type: 'int', nullable: true })
   ramGb: number | null;
 

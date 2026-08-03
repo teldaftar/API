@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsEnum,
   IsInt,
   IsNumber,
@@ -70,6 +71,14 @@ export class CreatePhoneDto {
   @IsOptional()
   @IsEnum(PhoneCondition)
   condition?: PhoneCondition;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Whether the phone has its original box. Independent of condition.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  hasBox?: boolean;
 
   @ApiPropertyOptional({ example: 8 })
   @IsOptional()

@@ -174,6 +174,7 @@ export class PhonesService {
       purchasePrice: dto.purchasePrice,
       listPrice: dto.listPrice ?? null,
       condition: dto.condition ?? null,
+      hasBox: dto.hasBox ?? null,
       ramGb: dto.ramGb ?? null,
       storageGb: dto.storageGb ?? null,
       imageUrl: dto.imageUrl ?? null,
@@ -283,6 +284,7 @@ export class PhonesService {
     if (dto.purchasePrice !== undefined) phone.purchasePrice = dto.purchasePrice;
     if (dto.listPrice !== undefined) phone.listPrice = dto.listPrice;
     if (dto.condition !== undefined) phone.condition = dto.condition;
+    if (dto.hasBox !== undefined) phone.hasBox = dto.hasBox;
     if (dto.ramGb !== undefined) phone.ramGb = dto.ramGb;
     if (dto.storageGb !== undefined) phone.storageGb = dto.storageGb;
     if (dto.imageUrl !== undefined) phone.imageUrl = dto.imageUrl;

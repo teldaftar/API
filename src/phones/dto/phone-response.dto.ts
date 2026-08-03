@@ -34,6 +34,11 @@ export class PhoneResponseDto {
   profit: number | null;
   @ApiPropertyOptional({ enum: PhoneCondition, nullable: true })
   condition: PhoneCondition | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Whether the phone has its original box (null = unknown).',
+  })
+  hasBox: boolean | null;
   @ApiPropertyOptional({ nullable: true }) ramGb: number | null;
   @ApiPropertyOptional({ nullable: true }) storageGb: number | null;
   @ApiPropertyOptional({ nullable: true }) imageUrl: string | null;
@@ -72,6 +77,7 @@ export class PhoneResponseDto {
             100
           : null,
       condition: phone.condition,
+      hasBox: phone.hasBox,
       ramGb: phone.ramGb,
       storageGb: phone.storageGb,
       imageUrl: phone.imageUrl,
