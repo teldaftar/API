@@ -168,6 +168,9 @@ export class PhonesService {
       shopId,
       name: dto.name.trim(),
       imei: dto.imei ?? null,
+      supplierName: dto.supplierName?.trim() ?? null,
+      supplierSurname: dto.supplierSurname?.trim() ?? null,
+      supplierPhone: dto.supplierPhone?.trim() ?? null,
       purchasePrice: dto.purchasePrice,
       listPrice: dto.listPrice ?? null,
       condition: dto.condition ?? null,
@@ -271,6 +274,12 @@ export class PhonesService {
     const previousImage = phone.imageUrl;
 
     if (dto.name !== undefined) phone.name = dto.name.trim();
+    if (dto.supplierName !== undefined)
+      phone.supplierName = dto.supplierName?.trim() ?? null;
+    if (dto.supplierSurname !== undefined)
+      phone.supplierSurname = dto.supplierSurname?.trim() ?? null;
+    if (dto.supplierPhone !== undefined)
+      phone.supplierPhone = dto.supplierPhone?.trim() ?? null;
     if (dto.purchasePrice !== undefined) phone.purchasePrice = dto.purchasePrice;
     if (dto.listPrice !== undefined) phone.listPrice = dto.listPrice;
     if (dto.condition !== undefined) phone.condition = dto.condition;

@@ -86,6 +86,9 @@ export class SalesService {
         debtAmount: debt ? debt.amount : 0,
         status: SaleStatus.COMPLETED,
         note: dto.note ?? null,
+        customerName:
+          dto.customerName?.trim() || debt?.customerName?.trim() || null,
+        customerPhone: dto.customerPhone?.trim() || debt?.customerPhone || null,
         soldBy: userId,
       });
 
@@ -165,6 +168,9 @@ export class SalesService {
         debtAmount: debt ? debt.amount : 0,
         status: SaleStatus.COMPLETED,
         note: dto.note ?? null,
+        customerName:
+          dto.customerName?.trim() || debt?.customerName?.trim() || null,
+        customerPhone: dto.customerPhone?.trim() || debt?.customerPhone || null,
         soldBy: userId,
       });
 
@@ -559,6 +565,8 @@ export class SalesService {
       debtAmount: sale.debtAmount,
       status: sale.status,
       note: sale.note,
+      customerName: sale.customerName,
+      customerPhone: sale.customerPhone,
       soldAt: sale.soldAt,
       profit: this.round2(profit),
       items: itemDtos,

@@ -115,6 +115,16 @@ export class SaleResponseDto {
   @ApiProperty() debtAmount: number;
   @ApiProperty({ enum: SaleStatus }) status: SaleStatus;
   @ApiPropertyOptional({ nullable: true }) note: string | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Buyer name captured at sale time (optional).',
+  })
+  customerName: string | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Buyer phone captured at sale time (optional).',
+  })
+  customerPhone: string | null;
   @ApiProperty() soldAt: Date;
 
   @ApiProperty({

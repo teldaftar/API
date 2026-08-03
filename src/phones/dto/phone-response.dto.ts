@@ -6,6 +6,18 @@ export class PhoneResponseDto {
   @ApiProperty() id: string;
   @ApiProperty() name: string;
   @ApiPropertyOptional({ nullable: true }) imei: string | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: "Supplier's first name — who the shop bought the phone from.",
+  })
+  supplierName: string | null;
+  @ApiPropertyOptional({ nullable: true, description: "Supplier's surname." })
+  supplierSurname: string | null;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: 'Supplier phone number for follow-up contact.',
+  })
+  supplierPhone: string | null;
   @ApiProperty({ description: 'What the shop paid (olingan narx)' })
   purchasePrice: number;
   @ApiPropertyOptional({ nullable: true }) listPrice: number | null;
@@ -48,6 +60,9 @@ export class PhoneResponseDto {
       id: phone.id,
       name: phone.name,
       imei: phone.imei,
+      supplierName: phone.supplierName,
+      supplierSurname: phone.supplierSurname,
+      supplierPhone: phone.supplierPhone,
       purchasePrice: phone.purchasePrice,
       listPrice: phone.listPrice,
       salePrice,

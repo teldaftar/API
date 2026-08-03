@@ -7,7 +7,6 @@ import {
   IsOptional,
   IsPositive,
   IsString,
-  Matches,
   MaxLength,
   Min,
   MinLength,
@@ -23,12 +22,36 @@ export class CreatePhoneDto {
 
   @ApiPropertyOptional({
     example: '356938035643809',
-    description: 'Optional. Digits only, 10–20 chars when provided.',
+    description: 'Optional. No length limit (supports dual-IMEI entries).',
   })
   @IsOptional()
   @IsString()
-  @Matches(/^\d{10,20}$/, { message: 'imei must be 10–20 digits' })
+  @MaxLength(500)
   imei?: string;
+
+  @ApiPropertyOptional({
+    example: 'Ali',
+    description: "Supplier's first name — who the shop bought the phone from.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  supplierName?: string;
+
+  @ApiPropertyOptional({ example: 'Valiyev', description: "Supplier's surname." })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  supplierSurname?: string;
+
+  @ApiPropertyOptional({
+    example: '+998901234567',
+    description: 'Supplier phone number for follow-up contact.',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  supplierPhone?: string;
 
   @ApiProperty({ example: 2500000, description: 'What the shop paid (UZS)' })
   @Type(() => Number)

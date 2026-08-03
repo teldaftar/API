@@ -60,6 +60,13 @@ export class Sale extends UuidEntity {
   @Column({ type: 'text', nullable: true })
   note: string | null;
 
+  /** Optional buyer contact captured at sale time (for any sale, not just debt). */
+  @Column({ name: 'customer_name', type: 'varchar', nullable: true })
+  customerName: string | null;
+
+  @Column({ name: 'customer_phone', type: 'varchar', nullable: true })
+  customerPhone: string | null;
+
   @Column({ name: 'sold_by', type: 'uuid' })
   soldBy: string;
 

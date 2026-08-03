@@ -3,6 +3,7 @@ import { SoftDeletableEntity, numericTransformer } from '../../common';
 
 export enum PhoneCondition {
   NEW = 'NEW',
+  MEDIUM = 'MEDIUM',
   USED = 'USED',
 }
 
@@ -21,8 +22,17 @@ export class Phone extends SoftDeletableEntity {
   @Column({ type: 'varchar' })
   name: string;
 
-  @Column({ type: 'varchar', length: 20, nullable: true })
+  @Column({ type: 'varchar', nullable: true })
   imei: string | null;
+
+  @Column({ name: 'supplier_name', type: 'varchar', nullable: true })
+  supplierName: string | null;
+
+  @Column({ name: 'supplier_surname', type: 'varchar', nullable: true })
+  supplierSurname: string | null;
+
+  @Column({ name: 'supplier_phone', type: 'varchar', nullable: true })
+  supplierPhone: string | null;
 
   @Column({
     name: 'purchase_price',

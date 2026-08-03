@@ -28,6 +28,24 @@ export class SellPhoneDto {
   @MaxLength(2000)
   note?: string;
 
+  @ApiPropertyOptional({
+    example: 'Ali Valiyev',
+    description: 'Optional buyer name for follow-up (not required).',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  customerName?: string;
+
+  @ApiPropertyOptional({
+    example: '+998901234567',
+    description: 'Optional buyer phone for follow-up (not required).',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  customerPhone?: string;
+
   @ApiPropertyOptional({ type: DebtInputDto })
   @IsOptional()
   @ValidateNested()
