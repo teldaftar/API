@@ -1,6 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SaleDebtSummaryDto } from '../../sales/dto/sale-response.dto';
-import { Phone, PhoneCondition, PhoneStatus } from '../entities/phone.entity';
+import {
+  Phone,
+  PhoneCondition,
+  PhoneStatus,
+  PhoneUsedGrade,
+} from '../entities/phone.entity';
 
 export class PhoneResponseDto {
   @ApiProperty() id: string;
@@ -34,6 +39,12 @@ export class PhoneResponseDto {
   profit: number | null;
   @ApiPropertyOptional({ enum: PhoneCondition, nullable: true })
   condition: PhoneCondition | null;
+  @ApiPropertyOptional({
+    enum: PhoneUsedGrade,
+    nullable: true,
+    description: 'Wear grade; only set when condition is USED, else null.',
+  })
+  usedGrade: PhoneUsedGrade | null;
   @ApiPropertyOptional({
     nullable: true,
     description: 'Whether the phone has its original box (null = unknown).',
@@ -77,6 +88,7 @@ export class PhoneResponseDto {
             100
           : null,
       condition: phone.condition,
+      usedGrade: phone.usedGrade,
       hasBox: phone.hasBox,
       ramGb: phone.ramGb,
       storageGb: phone.storageGb,

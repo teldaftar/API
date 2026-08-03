@@ -24,7 +24,12 @@ import { CreatePhoneDto } from './dto/create-phone.dto';
 import { PhoneLabelDto, PhoneResponseDto } from './dto/phone-response.dto';
 import { QueryPhonesDto } from './dto/query-phones.dto';
 import { UpdatePhoneDto } from './dto/update-phone.dto';
-import { Phone, PhoneStatus } from './entities/phone.entity';
+import {
+  Phone,
+  PhoneCondition,
+  PhoneStatus,
+  PhoneUsedGrade,
+} from './entities/phone.entity';
 
 @Injectable()
 export class PhonesService {
@@ -164,6 +169,9 @@ export class PhonesService {
       await this.assertImeiFree(shopId, dto.imei);
     }
 
+    const condition = dto.condition ?? null;
+    const usedGrade = this.resolveUsedGrade(condition, dto.usedGrade);
+
     const phone = this.phones.create({
       shopId,
       name: dto.name.trim(),
@@ -173,7 +181,8 @@ export class PhonesService {
       supplierPhone: dto.supplierPhone?.trim() ?? null,
       purchasePrice: dto.purchasePrice,
       listPrice: dto.listPrice ?? null,
-      condition: dto.condition ?? null,
+      condition,
+      usedGrade,
       hasBox: dto.hasBox ?? null,
       ramGb: dto.ramGb ?? null,
       storageGb: dto.storageGb ?? null,
@@ -284,6 +293,18 @@ export class PhonesService {
     if (dto.purchasePrice !== undefined) phone.purchasePrice = dto.purchasePrice;
     if (dto.listPrice !== undefined) phone.listPrice = dto.listPrice;
     if (dto.condition !== undefined) phone.condition = dto.condition;
+    if (dto.usedGrade !== undefined) phone.usedGrade = dto.usedGrade;
+    // Grade is only meaningful for USED phones: reject an explicit grade on a
+    // non-used phone, and clear any leftover grade when moving away from USED.
+    if (phone.condition !== PhoneCondition.USED) {
+      if (dto.usedGrade) {
+        throw BusinessException.badRequest(
+          ErrorCode.VALIDATION_FAILED,
+          'usedGrade is only allowed when condition is USED',
+        );
+      }
+      phone.usedGrade = null;
+    }
     if (dto.hasBox !== undefined) phone.hasBox = dto.hasBox;
     if (dto.ramGb !== undefined) phone.ramGb = dto.ramGb;
     if (dto.storageGb !== undefined) phone.storageGb = dto.storageGb;
@@ -343,6 +364,26 @@ export class PhonesService {
       imei: phone.imei,
       labelFooter: shop?.labelFooter ?? null,
     };
+  }
+
+  /**
+   * A wear grade is only valid for a USED phone. Rejects a grade sent with any
+   * other condition; returns null when the phone isn't USED.
+   */
+  private resolveUsedGrade(
+    condition: PhoneCondition | null,
+    usedGrade: PhoneUsedGrade | undefined,
+  ): PhoneUsedGrade | null {
+    if (condition !== PhoneCondition.USED) {
+      if (usedGrade) {
+        throw BusinessException.badRequest(
+          ErrorCode.VALIDATION_FAILED,
+          'usedGrade is only allowed when condition is USED',
+        );
+      }
+      return null;
+    }
+    return usedGrade ?? null;
   }
 
   /**

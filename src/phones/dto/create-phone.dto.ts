@@ -12,7 +12,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { PhoneCondition } from '../entities/phone.entity';
+import { PhoneCondition, PhoneUsedGrade } from '../entities/phone.entity';
 
 export class CreatePhoneDto {
   @ApiProperty({ example: 'Samsung Galaxy A54 5G' })
@@ -71,6 +71,14 @@ export class CreatePhoneDto {
   @IsOptional()
   @IsEnum(PhoneCondition)
   condition?: PhoneCondition;
+
+  @ApiPropertyOptional({
+    enum: PhoneUsedGrade,
+    description: "Wear grade. Only allowed when condition is USED.",
+  })
+  @IsOptional()
+  @IsEnum(PhoneUsedGrade)
+  usedGrade?: PhoneUsedGrade;
 
   @ApiPropertyOptional({
     example: true,

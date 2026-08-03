@@ -3,8 +3,14 @@ import { SoftDeletableEntity, numericTransformer } from '../../common';
 
 export enum PhoneCondition {
   NEW = 'NEW',
-  MEDIUM = 'MEDIUM',
   USED = 'USED',
+}
+
+/** Wear grade — only meaningful when {@link PhoneCondition.USED}. */
+export enum PhoneUsedGrade {
+  GOOD = 'GOOD',
+  MEDIUM = 'MEDIUM',
+  BAD = 'BAD',
 }
 
 export enum PhoneStatus {
@@ -55,6 +61,15 @@ export class Phone extends SoftDeletableEntity {
 
   @Column({ type: 'enum', enum: PhoneCondition, nullable: true })
   condition: PhoneCondition | null;
+
+  /** Wear grade; only set when {@link condition} is USED, else null. */
+  @Column({
+    name: 'used_grade',
+    type: 'enum',
+    enum: PhoneUsedGrade,
+    nullable: true,
+  })
+  usedGrade: PhoneUsedGrade | null;
 
   /** Whether the phone still has its original box. Independent of condition. */
   @Column({ name: 'has_box', type: 'boolean', nullable: true })
