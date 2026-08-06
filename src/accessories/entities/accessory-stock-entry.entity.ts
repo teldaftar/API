@@ -14,6 +14,10 @@ export class AccessoryStockEntry extends UuidEntity {
   @Column({ name: 'accessory_id', type: 'uuid' })
   accessoryId: string;
 
+  /** Set when the intake came in through a grouped stock receipt (prixod). */
+  @Column({ name: 'receipt_id', type: 'uuid', nullable: true })
+  receiptId: string | null;
+
   @Column({ type: 'int' })
   quantity: number;
 

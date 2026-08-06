@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsNumber, IsOptional, IsPositive, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsInt, IsNumber, IsOptional, IsPositive, IsString, MaxLength, Min, MinLength } from 'class-validator';
 import { CreateAccessoryDto } from './create-accessory.dto';
 
 /**
@@ -18,10 +18,13 @@ export class AddStockDto {
   @IsPositive()
   quantity: number;
 
-  @ApiProperty({ example: 16000, description: 'Cost of this intake' })
+  @ApiProperty({
+    example: 16000,
+    description: 'Cost of this intake. 0 allowed (free intake).',
+  })
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
-  @IsPositive()
+  @Min(0)
   purchasePrice: number;
 
   @ApiPropertyOptional()

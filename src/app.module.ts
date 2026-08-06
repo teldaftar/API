@@ -8,6 +8,7 @@ import { ShopModule } from './shop/shop.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { PhonesModule } from './phones/phones.module';
 import { AccessoriesModule } from './accessories/accessories.module';
+import { StockReceiptsModule } from './stock-receipts/stock-receipts.module';
 import { SalesModule } from './sales/sales.module';
 import { DebtsModule } from './debts/debts.module';
 import { ExpensesModule } from './expenses/expenses.module';
@@ -46,6 +47,7 @@ import { StatisticsModule } from './statistics/statistics.module';
     UploadsModule,
     PhonesModule,
     AccessoriesModule,
+    StockReceiptsModule,
     SalesModule,
     DebtsModule,
     ExpensesModule,

@@ -980,6 +980,227 @@
         ]
       }
     },
+    "/stock-receipts": {
+      "get": {
+        "operationId": "StockReceiptsController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Match on code or supplier name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Local date, inclusive",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Local date, inclusive",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List stock receipts (prixod), newest first",
+        "tags": [
+          "stock-receipts"
+        ]
+      },
+      "post": {
+        "operationId": "StockReceiptsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStockReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockReceiptResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create a grouped intake: restock existing and/or create new accessories",
+        "tags": [
+          "stock-receipts"
+        ]
+      }
+    },
+    "/stock-receipts/{id}": {
+      "get": {
+        "operationId": "StockReceiptsController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockReceiptResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get one stock receipt with its lines",
+        "tags": [
+          "stock-receipts"
+        ]
+      },
+      "patch": {
+        "operationId": "StockReceiptsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStockReceiptDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockReceiptResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Edit a receipt (replaces its lines; adjusts stock accordingly)",
+        "tags": [
+          "stock-receipts"
+        ]
+      },
+      "delete": {
+        "operationId": "StockReceiptsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Delete a receipt (only if none of its units have been sold)",
+        "tags": [
+          "stock-receipts"
+        ]
+      }
+    },
     "/sales": {
       "get": {
         "operationId": "SalesController_findAll",
@@ -1496,7 +1717,46 @@
             "access-token": []
           }
         ],
-        "summary": "Settle a debt in full",
+        "summary": "Record a debt payment (full or partial)",
+        "tags": [
+          "debts"
+        ]
+      }
+    },
+    "/debts/{id}/payments": {
+      "get": {
+        "operationId": "DebtsController_listPayments",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DebtPaymentResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List payments made against a debt",
         "tags": [
           "debts"
         ]
@@ -2091,12 +2351,27 @@
           "imei": {
             "type": "string",
             "example": "356938035643809",
-            "description": "Optional. Digits only, 10–20 chars when provided."
+            "description": "Optional. No length limit (supports dual-IMEI entries)."
+          },
+          "supplierName": {
+            "type": "string",
+            "example": "Ali",
+            "description": "Supplier's first name — who the shop bought the phone from."
+          },
+          "supplierSurname": {
+            "type": "string",
+            "example": "Valiyev",
+            "description": "Supplier's surname."
+          },
+          "supplierPhone": {
+            "type": "string",
+            "example": "+998901234567",
+            "description": "Supplier phone number for follow-up contact."
           },
           "purchasePrice": {
             "type": "number",
             "example": 2500000,
-            "description": "What the shop paid (UZS)"
+            "description": "What the shop paid (UZS). 0 allowed (free intake)."
           },
           "listPrice": {
             "type": "number",
@@ -2109,6 +2384,25 @@
               "NEW",
               "USED"
             ]
+          },
+          "usedGrade": {
+            "type": "string",
+            "enum": [
+              "GOOD",
+              "MEDIUM",
+              "BAD"
+            ],
+            "description": "Wear grade. Only allowed when condition is USED."
+          },
+          "hasBox": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether the phone has its original box. Independent of condition."
+          },
+          "hasCharger": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether the phone comes with its charger. Independent of condition and box."
           },
           "ramGb": {
             "type": "number",
@@ -2131,6 +2425,89 @@
           "purchasePrice"
         ]
       },
+      "DebtPaymentLineDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "paidAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "note": {
+            "type": "object",
+            "nullable": true
+          }
+        },
+        "required": [
+          "amount",
+          "paidAt"
+        ]
+      },
+      "SaleDebtSummaryDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "saleId": {
+            "type": "string",
+            "description": "The sale this debt belongs to"
+          },
+          "customerName": {
+            "type": "string"
+          },
+          "customerPhone": {
+            "type": "string"
+          },
+          "originalAmount": {
+            "type": "number",
+            "description": "Original debt amount at sale time"
+          },
+          "amount": {
+            "type": "number",
+            "description": "Remaining outstanding balance"
+          },
+          "paidTotal": {
+            "type": "number",
+            "description": "Total amount paid so far"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "isOverdue": {
+            "type": "boolean"
+          },
+          "daysOverdue": {
+            "type": "number"
+          },
+          "payments": {
+            "description": "Newest first",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DebtPaymentLineDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "saleId",
+          "customerName",
+          "customerPhone",
+          "originalAmount",
+          "amount",
+          "paidTotal",
+          "dueDate",
+          "status",
+          "isOverdue",
+          "daysOverdue",
+          "payments"
+        ]
+      },
       "PhoneResponseDto": {
         "type": "object",
         "properties": {
@@ -2143,6 +2520,21 @@
           "imei": {
             "type": "object",
             "nullable": true
+          },
+          "supplierName": {
+            "type": "object",
+            "nullable": true,
+            "description": "Supplier's first name — who the shop bought the phone from."
+          },
+          "supplierSurname": {
+            "type": "object",
+            "nullable": true,
+            "description": "Supplier's surname."
+          },
+          "supplierPhone": {
+            "type": "object",
+            "nullable": true,
+            "description": "Supplier phone number for follow-up contact."
           },
           "purchasePrice": {
             "type": "number",
@@ -2170,6 +2562,26 @@
             ],
             "nullable": true
           },
+          "usedGrade": {
+            "type": "string",
+            "enum": [
+              "GOOD",
+              "MEDIUM",
+              "BAD"
+            ],
+            "nullable": true,
+            "description": "Wear grade; only set when condition is USED, else null."
+          },
+          "hasBox": {
+            "type": "object",
+            "nullable": true,
+            "description": "Whether the phone has its original box (null = unknown)."
+          },
+          "hasCharger": {
+            "type": "object",
+            "nullable": true,
+            "description": "Whether the phone comes with its charger (null = unknown)."
+          },
           "ramGb": {
             "type": "object",
             "nullable": true
@@ -2191,6 +2603,16 @@
             "enum": [
               "IN_STOCK",
               "SOLD"
+            ]
+          },
+          "debt": {
+            "nullable": true,
+            "description": "Debt info when the phone was sold on debt; null otherwise. Shows original amount, remaining balance and the payment history.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/SaleDebtSummaryDto"
+              }
             ]
           },
           "createdAt": {
@@ -2221,12 +2643,27 @@
           "imei": {
             "type": "string",
             "example": "356938035643809",
-            "description": "Optional. Digits only, 10–20 chars when provided."
+            "description": "Optional. No length limit (supports dual-IMEI entries)."
+          },
+          "supplierName": {
+            "type": "string",
+            "example": "Ali",
+            "description": "Supplier's first name — who the shop bought the phone from."
+          },
+          "supplierSurname": {
+            "type": "string",
+            "example": "Valiyev",
+            "description": "Supplier's surname."
+          },
+          "supplierPhone": {
+            "type": "string",
+            "example": "+998901234567",
+            "description": "Supplier phone number for follow-up contact."
           },
           "purchasePrice": {
             "type": "number",
             "example": 2500000,
-            "description": "What the shop paid (UZS)"
+            "description": "What the shop paid (UZS). 0 allowed (free intake)."
           },
           "listPrice": {
             "type": "number",
@@ -2239,6 +2676,25 @@
               "NEW",
               "USED"
             ]
+          },
+          "usedGrade": {
+            "type": "string",
+            "enum": [
+              "GOOD",
+              "MEDIUM",
+              "BAD"
+            ],
+            "description": "Wear grade. Only allowed when condition is USED."
+          },
+          "hasBox": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether the phone has its original box. Independent of condition."
+          },
+          "hasCharger": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether the phone comes with its charger. Independent of condition and box."
           },
           "ramGb": {
             "type": "number",
@@ -2299,7 +2755,8 @@
           },
           "purchasePrice": {
             "type": "number",
-            "example": 15000
+            "example": 15000,
+            "description": "Cost. 0 allowed (free intake)."
           },
           "quantity": {
             "type": "number",
@@ -2468,7 +2925,8 @@
           },
           "purchasePrice": {
             "type": "number",
-            "example": 15000
+            "example": 15000,
+            "description": "Cost. 0 allowed (free intake)."
           },
           "salePrice": {
             "type": "number",
@@ -2493,7 +2951,7 @@
           "purchasePrice": {
             "type": "number",
             "example": 16000,
-            "description": "Cost of this intake"
+            "description": "Cost of this intake. 0 allowed (free intake)."
           },
           "note": {
             "type": "string"
@@ -2530,6 +2988,197 @@
           "quantity",
           "purchasePrice",
           "createdAt"
+        ]
+      },
+      "StockReceiptItemResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "accessoryId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "imageUrl": {
+            "type": "object",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "number"
+          },
+          "purchasePrice": {
+            "type": "number"
+          },
+          "lineTotal": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "accessoryId",
+          "name",
+          "quantity",
+          "purchasePrice",
+          "lineTotal"
+        ]
+      },
+      "StockReceiptResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string",
+            "example": "P-000123"
+          },
+          "supplierName": {
+            "type": "object",
+            "nullable": true
+          },
+          "supplierPhone": {
+            "type": "object",
+            "nullable": true
+          },
+          "totalAmount": {
+            "type": "number"
+          },
+          "totalQty": {
+            "type": "number"
+          },
+          "itemCount": {
+            "type": "number"
+          },
+          "note": {
+            "type": "object",
+            "nullable": true
+          },
+          "receivedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockReceiptItemResponseDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "totalAmount",
+          "totalQty",
+          "itemCount",
+          "receivedAt"
+        ]
+      },
+      "NewAccessoryInputDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Type-C kabel 1m"
+          },
+          "salePrice": {
+            "type": "number",
+            "example": 25000,
+            "description": "Default sale price"
+          },
+          "imageUrl": {
+            "type": "string",
+            "example": "/uploads/abc.webp"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "StockReceiptLineDto": {
+        "type": "object",
+        "properties": {
+          "accessoryId": {
+            "type": "string",
+            "description": "Existing accessory to restock"
+          },
+          "newAccessory": {
+            "description": "Create a new accessory for this line instead",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/NewAccessoryInputDto"
+              }
+            ]
+          },
+          "quantity": {
+            "type": "number",
+            "example": 20,
+            "description": "Quantity received"
+          },
+          "purchasePrice": {
+            "type": "number",
+            "example": 12000,
+            "description": "Unit cost of this intake. 0 allowed (free intake)."
+          }
+        },
+        "required": [
+          "quantity",
+          "purchasePrice"
+        ]
+      },
+      "CreateStockReceiptDto": {
+        "type": "object",
+        "properties": {
+          "supplierName": {
+            "type": "string",
+            "example": "Ali (postavshik)"
+          },
+          "supplierPhone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "note": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockReceiptLineDto"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "UpdateStockReceiptDto": {
+        "type": "object",
+        "properties": {
+          "supplierName": {
+            "type": "string",
+            "example": "Ali (postavshik)"
+          },
+          "supplierPhone": {
+            "type": "string",
+            "example": "+998901234567"
+          },
+          "note": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockReceiptLineDto"
+            }
+          }
+        },
+        "required": [
+          "items"
         ]
       },
       "SaleProductSnapshotDto": {
@@ -2603,45 +3252,6 @@
           "product"
         ]
       },
-      "SaleDebtSummaryDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "customerName": {
-            "type": "string"
-          },
-          "customerPhone": {
-            "type": "string"
-          },
-          "amount": {
-            "type": "number"
-          },
-          "dueDate": {
-            "type": "string"
-          },
-          "status": {
-            "type": "string"
-          },
-          "isOverdue": {
-            "type": "boolean"
-          },
-          "daysOverdue": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "id",
-          "customerName",
-          "customerPhone",
-          "amount",
-          "dueDate",
-          "status",
-          "isOverdue",
-          "daysOverdue"
-        ]
-      },
       "SaleResponseDto": {
         "type": "object",
         "properties": {
@@ -2678,6 +3288,16 @@
           "note": {
             "type": "object",
             "nullable": true
+          },
+          "customerName": {
+            "type": "object",
+            "nullable": true,
+            "description": "Buyer name captured at sale time (optional)."
+          },
+          "customerPhone": {
+            "type": "object",
+            "nullable": true,
+            "description": "Buyer phone captured at sale time (optional)."
           },
           "soldAt": {
             "format": "date-time",
@@ -2760,6 +3380,16 @@
           "note": {
             "type": "string"
           },
+          "customerName": {
+            "type": "string",
+            "example": "Ali Valiyev",
+            "description": "Optional buyer name for follow-up (not required)."
+          },
+          "customerPhone": {
+            "type": "string",
+            "example": "+998901234567",
+            "description": "Optional buyer phone for follow-up (not required)."
+          },
           "debt": {
             "$ref": "#/components/schemas/DebtInputDto"
           }
@@ -2786,6 +3416,16 @@
           },
           "note": {
             "type": "string"
+          },
+          "customerName": {
+            "type": "string",
+            "example": "Ali Valiyev",
+            "description": "Optional buyer name for follow-up (not required)."
+          },
+          "customerPhone": {
+            "type": "string",
+            "example": "+998901234567",
+            "description": "Optional buyer phone for follow-up (not required)."
           },
           "debt": {
             "$ref": "#/components/schemas/DebtInputDto"
@@ -2885,7 +3525,11 @@
           },
           "amount": {
             "type": "number",
-            "description": "Amount still owed"
+            "description": "Amount still owed (outstanding balance)"
+          },
+          "paidTotal": {
+            "type": "number",
+            "description": "Sum of all payments made against this debt"
           },
           "dueDate": {
             "type": "string"
@@ -2927,6 +3571,7 @@
           "saleTotalAmount",
           "paidAmount",
           "amount",
+          "paidTotal",
           "dueDate",
           "status",
           "isOverdue",
@@ -2937,11 +3582,56 @@
       "PayDebtDto": {
         "type": "object",
         "properties": {
+          "amount": {
+            "type": "number",
+            "description": "Payment amount. May be a partial payment; cannot exceed the remaining balance.",
+            "example": 1000000
+          },
           "paidAt": {
             "type": "string",
-            "description": "Settlement date; defaults to today (shop-local)"
+            "description": "Payment date; defaults to today (shop-local). May be back-dated."
+          },
+          "note": {
+            "type": "string",
+            "description": "Optional note for this payment"
           }
-        }
+        },
+        "required": [
+          "amount"
+        ]
+      },
+      "DebtPaymentResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "debtId": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "paidAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "note": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "debtId",
+          "amount",
+          "paidAt",
+          "createdAt"
+        ]
       },
       "UpdateDebtDto": {
         "type": "object",

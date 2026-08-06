@@ -54,10 +54,13 @@ export class CreatePhoneDto {
   @MaxLength(30)
   supplierPhone?: string;
 
-  @ApiProperty({ example: 2500000, description: 'What the shop paid (UZS)' })
+  @ApiProperty({
+    example: 2500000,
+    description: 'What the shop paid (UZS). 0 allowed (free intake).',
+  })
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
-  @IsPositive()
+  @Min(0)
   purchasePrice: number;
 
   @ApiPropertyOptional({ example: 3000000, description: 'Internal reference only' })

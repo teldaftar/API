@@ -18,10 +18,10 @@ export class CreateAccessoryDto {
   @MaxLength(200)
   name: string;
 
-  @ApiProperty({ example: 15000 })
+  @ApiProperty({ example: 15000, description: 'Cost. 0 allowed (free intake).' })
   @Type(() => Number)
   @IsNumber({ maxDecimalPlaces: 2 })
-  @IsPositive()
+  @Min(0)
   purchasePrice: number;
 
   @ApiProperty({ example: 10, description: 'Initial stock quantity' })
