@@ -51,13 +51,17 @@ export class DebtStatsDto {
 }
 
 export class TotalsStatsDto {
-  @ApiProperty({ description: 'phone profit + accessory profit, net of returns' })
+  @ApiProperty({
+    description: 'phone profit + accessory profit, net of returns',
+  })
   grossProfit: number;
   @ApiProperty({ description: 'grossProfit - expenses' })
   netProfit: number;
   @ApiProperty({ description: 'sale paidAmount + debts settled within range' })
   cashIn: number;
-  @ApiProperty({ description: 'expenses + phone/accessory purchases within range' })
+  @ApiProperty({
+    description: 'expenses + phone/accessory purchases within range',
+  })
   cashOut: number;
 }
 

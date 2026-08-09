@@ -31,6 +31,8 @@ export class AccessoryResponseDto {
 export class StockEntryResponseDto {
   @ApiProperty() id: string;
   @ApiProperty() quantity: number;
+  @ApiProperty({ description: 'Units from this batch still on hand (FIFO)' })
+  remainingQuantity: number;
   @ApiProperty() purchasePrice: number;
   @ApiPropertyOptional({ nullable: true }) note: string | null;
   @ApiProperty() createdAt: Date;
@@ -39,6 +41,7 @@ export class StockEntryResponseDto {
     return {
       id: e.id,
       quantity: e.quantity,
+      remainingQuantity: e.remainingQuantity,
       purchasePrice: e.purchasePrice,
       note: e.note,
       createdAt: e.createdAt,

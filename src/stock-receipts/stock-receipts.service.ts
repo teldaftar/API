@@ -23,25 +23,27 @@ import {
   StockReceiptResponseDto,
 } from './dto/stock-receipt-response.dto';
 import { StockReceiptCounter } from './entities/stock-receipt-counter.entity';
-import { StockReceiptItem } from './entities/stock-receipt-item.entity';
 import { StockReceipt } from './entities/stock-receipt.entity';
 
+/**
+ * A receipt's lines ARE the FIFO layers it created (`accessory_stock_entries`
+ * tagged with the receipt id). There's no separate line table: create/edit/
+ * delete manage those layers directly, and each accessory appears at most once
+ * per receipt so a line maps 1:1 to a layer by (receipt_id, accessory_id).
+ */
 @Injectable()
 export class StockReceiptsService {
   constructor(
     @InjectRepository(StockReceipt)
     private readonly receipts: Repository<StockReceipt>,
-    @InjectRepository(StockReceiptItem)
-    private readonly items: Repository<StockReceiptItem>,
+    @InjectRepository(AccessoryStockEntry)
+    private readonly layers: Repository<AccessoryStockEntry>,
+    @InjectRepository(Accessory)
+    private readonly accessoryRepo: Repository<Accessory>,
     private readonly dataSource: DataSource,
     private readonly accessories: AccessoriesService,
   ) {}
 
-  /**
-   * Create a grouped intake. For each line either restock an existing accessory
-   * or create a new one, then apply the intake (stock entry + quantity bump)
-   * through the shared AccessoriesService helpers. All in one transaction.
-   */
   async create(
     shopId: string,
     userId: string,
@@ -64,7 +66,6 @@ export class StockReceiptsService {
 
       let totalAmount = 0;
       let totalQty = 0;
-
       for (const line of dto.items) {
         const accessory = line.accessoryId
           ? await this.accessories.lockAccessory(
@@ -72,15 +73,7 @@ export class StockReceiptsService {
               shopId,
               line.accessoryId,
             )
-          : await manager.getRepository(Accessory).save({
-              shopId,
-              name: line.newAccessory!.name.trim(),
-              purchasePrice: line.purchasePrice,
-              salePrice: line.newAccessory!.salePrice ?? null,
-              quantity: 0,
-              imageUrl: line.newAccessory!.imageUrl ?? null,
-              note: line.newAccessory!.note ?? null,
-            });
+          : await this.createInlineAccessory(manager, shopId, line);
 
         await this.accessories.applyIntake(
           manager,
@@ -90,18 +83,7 @@ export class StockReceiptsService {
           null,
           receipt.id,
         );
-
-        const lineTotal = this.round2(line.purchasePrice * line.quantity);
-        await manager.getRepository(StockReceiptItem).save({
-          shopId,
-          receiptId: receipt.id,
-          accessoryId: accessory.id,
-          quantity: line.quantity,
-          purchasePrice: line.purchasePrice,
-          lineTotal,
-        });
-
-        totalAmount += lineTotal;
+        totalAmount += this.round2(line.purchasePrice * line.quantity);
         totalQty += line.quantity;
       }
 
@@ -116,11 +98,11 @@ export class StockReceiptsService {
   }
 
   /**
-   * Edit a receipt: fully replace its line set. Applies the net quantity change
-   * per accessory (delta = new − old), refuses to drop an accessory below what
-   * is currently in stock (units may have been sold), then rewrites the stock
-   * entries + line items and refreshes each accessory's latest cost. One
-   * transaction.
+   * Edit a receipt: reconcile its layers against the new line set. Each layer
+   * is matched by accessory; an existing layer's quantity can't drop below what
+   * it has already given to sales (`quantity − remaining`), a removed line's
+   * layer must be untouched by sales, and new lines create fresh layers. Then
+   * every affected accessory is recomputed. One transaction.
    */
   async update(
     shopId: string,
@@ -137,120 +119,87 @@ export class StockReceiptsService {
         throw BusinessException.notFound('Stock receipt not found');
       }
 
-      const oldQtyByAcc = await this.receiptQtyByAccessory(manager, shopId, id);
+      const layerRepo = manager.getRepository(AccessoryStockEntry);
+      const existing = await layerRepo.find({
+        where: { receiptId: id, shopId },
+      });
+      const layerByAcc = new Map(existing.map((l) => [l.accessoryId, l]));
 
-      // Resolve new lines → accessories (lock existing / create new), tally qty.
-      const resolved: Array<{
-        accessory: Accessory;
-        quantity: number;
-        purchasePrice: number;
-      }> = [];
-      const newQtyByAcc = new Map<string, number>();
-      const locked = new Map<string, Accessory>();
-
-      for (const line of dto.items) {
-        let accessory: Accessory;
-        if (line.accessoryId) {
-          accessory =
-            locked.get(line.accessoryId) ??
-            (await this.accessories.lockAccessory(
-              manager,
-              shopId,
-              line.accessoryId,
-            ));
-        } else {
-          accessory = await manager.getRepository(Accessory).save({
-            shopId,
-            name: line.newAccessory!.name.trim(),
-            purchasePrice: line.purchasePrice,
-            salePrice: line.newAccessory!.salePrice ?? null,
-            quantity: 0,
-            imageUrl: line.newAccessory!.imageUrl ?? null,
-            note: line.newAccessory!.note ?? null,
-          });
-        }
-        locked.set(accessory.id, accessory);
-        resolved.push({
-          accessory,
-          quantity: line.quantity,
-          purchasePrice: line.purchasePrice,
-        });
-        newQtyByAcc.set(
-          accessory.id,
-          (newQtyByAcc.get(accessory.id) ?? 0) + line.quantity,
-        );
-      }
-
-      // Lock any accessory that was only on the OLD lines (to lower its qty).
-      for (const accId of oldQtyByAcc.keys()) {
-        if (!locked.has(accId)) {
-          locked.set(
-            accId,
-            await this.accessories.lockAccessory(manager, shopId, accId),
-          );
-        }
-      }
-
-      // Apply per-accessory delta with the sold-floor guard.
-      const affected = new Set<string>([
-        ...oldQtyByAcc.keys(),
-        ...newQtyByAcc.keys(),
-      ]);
-      for (const accId of affected) {
-        const accessory = locked.get(accId)!;
-        const delta =
-          (newQtyByAcc.get(accId) ?? 0) - (oldQtyByAcc.get(accId) ?? 0);
-        const nextQty = accessory.quantity + delta;
-        if (nextQty < 0) {
-          throw BusinessException.conflict(
-            ErrorCode.INSUFFICIENT_STOCK,
-            'Cannot reduce this intake below what is already sold',
-            { accessoryId: accId, available: accessory.quantity },
-          );
-        }
-        accessory.quantity = nextQty;
-      }
-
-      // Rewrite this receipt's stock entries + line items.
-      await manager
-        .getRepository(AccessoryStockEntry)
-        .delete({ receiptId: id, shopId });
-      await manager
-        .getRepository(StockReceiptItem)
-        .delete({ receiptId: id, shopId });
+      const touched = new Map<string, Accessory>();
+      const keptAccessoryIds = new Set<string>();
 
       let totalAmount = 0;
       let totalQty = 0;
-      for (const r of resolved) {
-        // Preserve the receipt's date on its entries so "latest cost" ordering
-        // stays chronological even when editing an older receipt.
-        await manager.getRepository(AccessoryStockEntry).save({
-          shopId,
-          accessoryId: r.accessory.id,
-          receiptId: id,
-          quantity: r.quantity,
-          purchasePrice: r.purchasePrice,
-          note: null,
-          createdAt: receipt.receivedAt,
-        });
-        const lineTotal = this.round2(r.purchasePrice * r.quantity);
-        await manager.getRepository(StockReceiptItem).save({
-          shopId,
-          receiptId: id,
-          accessoryId: r.accessory.id,
-          quantity: r.quantity,
-          purchasePrice: r.purchasePrice,
-          lineTotal,
-        });
-        totalAmount += lineTotal;
-        totalQty += r.quantity;
+
+      for (const line of dto.items) {
+        const accessory = line.accessoryId
+          ? await this.accessories.lockAccessory(
+              manager,
+              shopId,
+              line.accessoryId,
+            )
+          : await this.createInlineAccessory(manager, shopId, line);
+        touched.set(accessory.id, accessory);
+        keptAccessoryIds.add(accessory.id);
+
+        const layer = layerByAcc.get(accessory.id);
+        if (layer) {
+          const consumed = layer.quantity - layer.remainingQuantity;
+          if (line.quantity < consumed) {
+            throw BusinessException.conflict(
+              ErrorCode.INSUFFICIENT_STOCK,
+              'Cannot reduce this line below what has already been sold',
+              { accessoryId: accessory.id, minQuantity: consumed },
+            );
+          }
+          layer.quantity = line.quantity;
+          layer.remainingQuantity = line.quantity - consumed;
+          layer.purchasePrice = line.purchasePrice;
+          await layerRepo.save(layer);
+        } else {
+          await layerRepo.save({
+            shopId,
+            accessoryId: accessory.id,
+            receiptId: id,
+            saleReturnId: null,
+            quantity: line.quantity,
+            remainingQuantity: line.quantity,
+            purchasePrice: line.purchasePrice,
+            note: null,
+            // Keep the receipt's date on its layers so FIFO order is stable.
+            createdAt: receipt.receivedAt,
+          });
+        }
+
+        totalAmount += this.round2(line.purchasePrice * line.quantity);
+        totalQty += line.quantity;
       }
 
-      // Persist quantities + recompute each accessory's latest cost.
-      for (const accId of affected) {
-        const accessory = locked.get(accId)!;
-        await manager.getRepository(Accessory).save(accessory);
-        await this.accessories.refreshLatestCost(manager, accessory);
+      // Lines dropped from the receipt: only removable if nothing was sold.
+      for (const layer of existing) {
+        if (keptAccessoryIds.has(layer.accessoryId)) continue;
+        if (layer.quantity !== layer.remainingQuantity) {
+          throw BusinessException.conflict(
+            ErrorCode.INSUFFICIENT_STOCK,
+            'Cannot remove a line whose units have already been sold',
+            { accessoryId: layer.accessoryId },
+          );
+        }
+        await layerRepo.delete({ id: layer.id });
+        if (!touched.has(layer.accessoryId)) {
+          touched.set(
+            layer.accessoryId,
+            await this.accessories.lockAccessory(
+              manager,
+              shopId,
+              layer.accessoryId,
+            ),
+          );
+        }
+      }
+
+      for (const accessory of touched.values()) {
+        await this.accessories.recalcAccessory(manager, accessory);
       }
 
       receipt.itemCount = dto.items.length;
@@ -268,9 +217,9 @@ export class StockReceiptsService {
   }
 
   /**
-   * Delete a receipt: reverse its intake (subtract each line's quantity from
-   * its accessory), refusing if that would drop an accessory below zero — i.e.
-   * some received units have already been sold. One transaction.
+   * Delete a receipt: allowed only if none of its layers have been sold from
+   * (each layer still fully remaining). Removes the layers + receipt and
+   * recomputes each affected accessory. One transaction.
    */
   async remove(shopId: string, id: string): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
@@ -281,68 +230,39 @@ export class StockReceiptsService {
         throw BusinessException.notFound('Stock receipt not found');
       }
 
-      const oldQtyByAcc = await this.receiptQtyByAccessory(manager, shopId, id);
-      const locked = new Map<string, Accessory>();
+      const layerRepo = manager.getRepository(AccessoryStockEntry);
+      const existing = await layerRepo.find({
+        where: { receiptId: id, shopId },
+      });
 
-      for (const [accId, qty] of oldQtyByAcc) {
-        const accessory = await this.accessories.lockAccessory(
-          manager,
-          shopId,
-          accId,
-        );
-        const nextQty = accessory.quantity - qty;
-        if (nextQty < 0) {
+      const touched = new Map<string, Accessory>();
+      for (const layer of existing) {
+        if (layer.quantity !== layer.remainingQuantity) {
           throw BusinessException.conflict(
             ErrorCode.INSUFFICIENT_STOCK,
             'Cannot delete: some received units have already been sold',
-            { accessoryId: accId, available: accessory.quantity },
+            { accessoryId: layer.accessoryId },
           );
         }
-        accessory.quantity = nextQty;
-        locked.set(accId, accessory);
+        if (!touched.has(layer.accessoryId)) {
+          touched.set(
+            layer.accessoryId,
+            await this.accessories.lockAccessory(
+              manager,
+              shopId,
+              layer.accessoryId,
+            ),
+          );
+        }
       }
 
-      await manager
-        .getRepository(AccessoryStockEntry)
-        .delete({ receiptId: id, shopId });
-      await manager
-        .getRepository(StockReceiptItem)
-        .delete({ receiptId: id, shopId });
+      await layerRepo.delete({ receiptId: id, shopId });
       await manager.getRepository(StockReceipt).delete({ id, shopId });
 
-      for (const accessory of locked.values()) {
-        await manager.getRepository(Accessory).save(accessory);
-        await this.accessories.refreshLatestCost(manager, accessory);
+      for (const accessory of touched.values()) {
+        await this.accessories.recalcAccessory(manager, accessory);
       }
     });
-  }
-
-  /** Each line must carry exactly one of accessoryId / newAccessory. */
-  private assertLines(lines: StockReceiptLineDto[]): void {
-    for (const line of lines) {
-      if (Boolean(line.accessoryId) === Boolean(line.newAccessory)) {
-        throw BusinessException.badRequest(
-          ErrorCode.RECEIPT_LINE_INVALID,
-          'Each line must have exactly one of accessoryId or newAccessory',
-        );
-      }
-    }
-  }
-
-  /** Sum of quantities per accessory currently recorded on a receipt. */
-  private async receiptQtyByAccessory(
-    manager: EntityManager,
-    shopId: string,
-    receiptId: string,
-  ): Promise<Map<string, number>> {
-    const rows = await manager
-      .getRepository(StockReceiptItem)
-      .find({ where: { receiptId, shopId } });
-    const byAcc = new Map<string, number>();
-    for (const it of rows) {
-      byAcc.set(it.accessoryId, (byAcc.get(it.accessoryId) ?? 0) + it.quantity);
-    }
-    return byAcc;
   }
 
   async findAll(
@@ -391,29 +311,72 @@ export class StockReceiptsService {
       throw BusinessException.notFound('Stock receipt not found');
     }
 
-    const items = await this.items.find({ where: { receiptId: id, shopId } });
-    const accessories = items.length
-      ? await this.dataSource.getRepository(Accessory).find({
-          where: { id: In(items.map((i) => i.accessoryId)), shopId },
+    const lines = await this.layers.find({
+      where: { receiptId: id, shopId },
+      order: { createdAt: 'ASC', id: 'ASC' },
+    });
+    const accessories = lines.length
+      ? await this.accessoryRepo.find({
+          where: { id: In(lines.map((l) => l.accessoryId)), shopId },
           withDeleted: true,
         })
       : [];
     const accMap = new Map(accessories.map((a) => [a.id, a]));
 
-    const itemDtos: StockReceiptItemResponseDto[] = items.map((i) => {
-      const acc = accMap.get(i.accessoryId);
+    const items: StockReceiptItemResponseDto[] = lines.map((l) => {
+      const acc = accMap.get(l.accessoryId);
       return {
-        id: i.id,
-        accessoryId: i.accessoryId,
+        id: l.id,
+        accessoryId: l.accessoryId,
         name: acc?.name ?? '',
         imageUrl: acc?.imageUrl ?? null,
-        quantity: i.quantity,
-        purchasePrice: i.purchasePrice,
-        lineTotal: i.lineTotal,
+        quantity: l.quantity,
+        remaining: l.remainingQuantity,
+        purchasePrice: l.purchasePrice,
+        lineTotal: this.round2(l.purchasePrice * l.quantity),
       };
     });
 
-    return StockReceiptResponseDto.from(receipt, itemDtos);
+    return StockReceiptResponseDto.from(receipt, items);
+  }
+
+  private async createInlineAccessory(
+    manager: EntityManager,
+    shopId: string,
+    line: StockReceiptLineDto,
+  ): Promise<Accessory> {
+    return manager.getRepository(Accessory).save({
+      shopId,
+      name: line.newAccessory!.name.trim(),
+      purchasePrice: line.purchasePrice,
+      salePrice: line.newAccessory!.salePrice ?? null,
+      quantity: 0,
+      imageUrl: line.newAccessory!.imageUrl ?? null,
+      note: line.newAccessory!.note ?? null,
+    });
+  }
+
+  /** Each line carries exactly one of accessoryId / newAccessory, and no two
+   * lines target the same existing accessory (one layer per accessory). */
+  private assertLines(lines: StockReceiptLineDto[]): void {
+    const seen = new Set<string>();
+    for (const line of lines) {
+      if (Boolean(line.accessoryId) === Boolean(line.newAccessory)) {
+        throw BusinessException.badRequest(
+          ErrorCode.RECEIPT_LINE_INVALID,
+          'Each line must have exactly one of accessoryId or newAccessory',
+        );
+      }
+      if (line.accessoryId) {
+        if (seen.has(line.accessoryId)) {
+          throw BusinessException.badRequest(
+            ErrorCode.RECEIPT_LINE_INVALID,
+            'The same accessory cannot appear twice in one receipt',
+          );
+        }
+        seen.add(line.accessoryId);
+      }
+    }
   }
 
   private async nextReceiptCode(

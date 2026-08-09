@@ -11,16 +11,16 @@ import {
   localDateEndExclusiveUtc,
   todayLocalDateString,
 } from '../common';
+import { AccessoriesService } from '../accessories/accessories.service';
 import { Accessory } from '../accessories/entities/accessory.entity';
 import { Debt, DebtStatus } from '../debts/entities/debt.entity';
 import { Phone, PhoneStatus } from '../phones/entities/phone.entity';
 import { DebtPayment } from '../debts/entities/debt-payment.entity';
 import { CreateReturnDto } from './dto/create-return.dto';
+import { CreateSaleDto, SaleLineDto } from './dto/create-sale.dto';
 import { DebtInputDto } from './dto/debt-input.dto';
 import { buildDebtSummary, SaleResponseDto } from './dto/sale-response.dto';
 import { QuerySalesDto } from './dto/query-sales.dto';
-import { SellAccessoryDto } from './dto/sell-accessory.dto';
-import { SellPhoneDto } from './dto/sell-phone.dto';
 import { SaleCounter } from './entities/sale-counter.entity';
 import { SaleItem, SaleItemType } from './entities/sale-item.entity';
 import { SaleReturn } from './entities/sale-return.entity';
@@ -38,50 +38,74 @@ export class SalesService {
     @InjectRepository(DebtPayment)
     private readonly debtPayments: Repository<DebtPayment>,
     private readonly dataSource: DataSource,
+    private readonly accessories: AccessoriesService,
   ) {}
 
   // ---------------------------------------------------------------------------
   // Selling
   // ---------------------------------------------------------------------------
 
-  async sellPhone(
+  /**
+   * Create one sale bundling any mix of phones and accessories. Each accessory
+   * line names the exact stock batch (`stockEntryId`) the seller chose to sell
+   * from — its cost is that batch's purchase price. Runs in a single
+   * transaction with pessimistic locks on every phone / accessory / batch.
+   */
+  async createSale(
     shopId: string,
     userId: string,
-    dto: SellPhoneDto,
+    dto: CreateSaleDto,
   ): Promise<SaleResponseDto> {
-    const debt = dto.debt
-      ? this.validateDebt(dto.debt, dto.price)
-      : null;
-
     const saleId = await this.dataSource.transaction(async (manager) => {
-      const phone = await manager
-        .getRepository(Phone)
-        .createQueryBuilder('phone')
-        .setLock('pessimistic_write')
-        .where('phone.id = :id AND phone.shop_id = :shopId', {
-          id: dto.phoneId,
-          shopId,
-        })
-        .andWhere('phone.deleted_at IS NULL')
-        .getOne();
+      const phoneIdsSeen = new Set<string>();
+      const stockEntryIdsSeen = new Set<string>();
+      let hasPhone = false;
+      let hasAccessory = false;
+      let totalAmount = 0;
 
-      if (!phone) {
-        throw BusinessException.notFound('Phone not found');
-      }
-      if (phone.status !== PhoneStatus.IN_STOCK) {
-        throw BusinessException.conflict(
-          ErrorCode.PHONE_ALREADY_SOLD,
-          'This phone has already been sold',
-        );
+      // Build every line first (locking + consuming stock), then the header.
+      const pendingItems: Array<Partial<SaleItem>> = [];
+
+      for (const line of dto.items) {
+        if (line.type === SaleItemType.PHONE) {
+          hasPhone = true;
+          const built = await this.buildPhoneLine(
+            manager,
+            shopId,
+            line,
+            phoneIdsSeen,
+          );
+          pendingItems.push(built.item);
+          totalAmount += built.lineTotal;
+        } else {
+          hasAccessory = true;
+          const built = await this.buildAccessoryLine(
+            manager,
+            shopId,
+            line,
+            stockEntryIdsSeen,
+          );
+          pendingItems.push(built.item);
+          totalAmount += built.lineTotal;
+        }
       }
 
-      const paidAmount = debt ? dto.price - debt.amount : dto.price;
+      totalAmount = this.round2(totalAmount);
+      const type =
+        hasPhone && hasAccessory
+          ? SaleType.MIXED
+          : hasPhone
+            ? SaleType.PHONE
+            : SaleType.ACCESSORY;
+
+      const debt = dto.debt ? this.validateDebt(dto.debt, totalAmount) : null;
+      const paidAmount = debt ? totalAmount - debt.amount : totalAmount;
 
       const sale = await manager.getRepository(Sale).save({
         shopId,
         code: await this.nextSaleCode(manager, shopId),
-        type: SaleType.PHONE,
-        totalAmount: dto.price,
+        type,
+        totalAmount,
         paidAmount,
         debtAmount: debt ? debt.amount : 0,
         status: SaleStatus.COMPLETED,
@@ -92,21 +116,14 @@ export class SalesService {
         soldBy: userId,
       });
 
-      await manager.getRepository(SaleItem).save({
-        shopId,
-        saleId: sale.id,
-        itemType: SaleItemType.PHONE,
-        phoneId: phone.id,
-        accessoryId: null,
-        quantity: 1,
-        unitPrice: dto.price,
-        costPrice: phone.purchasePrice,
-        lineTotal: dto.price,
-        returnedQuantity: 0,
-      });
-
-      phone.status = PhoneStatus.SOLD;
-      await manager.getRepository(Phone).save(phone);
+      await manager.getRepository(SaleItem).save(
+        pendingItems.map((item) => ({
+          ...item,
+          shopId,
+          saleId: sale.id,
+          returnedQuantity: 0,
+        })),
+      );
 
       if (debt) {
         await this.createDebt(manager, shopId, sale.id, debt);
@@ -118,86 +135,117 @@ export class SalesService {
     return this.findOne(shopId, saleId);
   }
 
-  async sellAccessory(
+  /** Lock a phone, flip it to SOLD, and shape its sale-item line. */
+  private async buildPhoneLine(
+    manager: EntityManager,
     shopId: string,
-    userId: string,
-    dto: SellAccessoryDto,
-  ): Promise<SaleResponseDto> {
-    const saleId = await this.dataSource.transaction(async (manager) => {
-      const accessory = await manager
-        .getRepository(Accessory)
-        .createQueryBuilder('a')
-        .setLock('pessimistic_write')
-        .where('a.id = :id AND a.shop_id = :shopId', {
-          id: dto.accessoryId,
-          shopId,
-        })
-        .andWhere('a.deleted_at IS NULL')
-        .getOne();
+    line: SaleLineDto,
+    phoneIdsSeen: Set<string>,
+  ): Promise<{ item: Partial<SaleItem>; lineTotal: number }> {
+    if (!line.phoneId) {
+      throw BusinessException.badRequest(
+        ErrorCode.SALE_LINE_INVALID,
+        'phoneId is required for a phone line',
+      );
+    }
+    if (phoneIdsSeen.has(line.phoneId)) {
+      throw BusinessException.badRequest(
+        ErrorCode.SALE_LINE_INVALID,
+        'The same phone cannot appear twice in one sale',
+      );
+    }
+    phoneIdsSeen.add(line.phoneId);
 
-      if (!accessory) {
-        throw BusinessException.notFound('Accessory not found');
-      }
-
-      if (dto.quantity > accessory.quantity) {
-        throw BusinessException.conflict(
-          ErrorCode.INSUFFICIENT_STOCK,
-          'Not enough stock for this sale',
-          { available: accessory.quantity },
-        );
-      }
-
-      const unitPrice = dto.unitPrice ?? accessory.salePrice;
-      if (unitPrice === null || unitPrice === undefined) {
-        throw BusinessException.badRequest(
-          ErrorCode.PRICE_REQUIRED,
-          'A unit price is required (no default sale price on the accessory)',
-        );
-      }
-
-      const lineTotal = this.round2(unitPrice * dto.quantity);
-      const debt = dto.debt ? this.validateDebt(dto.debt, lineTotal) : null;
-      const paidAmount = debt ? lineTotal - debt.amount : lineTotal;
-
-      const sale = await manager.getRepository(Sale).save({
+    const phone = await manager
+      .getRepository(Phone)
+      .createQueryBuilder('phone')
+      .setLock('pessimistic_write')
+      .where('phone.id = :id AND phone.shop_id = :shopId', {
+        id: line.phoneId,
         shopId,
-        code: await this.nextSaleCode(manager, shopId),
-        type: SaleType.ACCESSORY,
-        totalAmount: lineTotal,
-        paidAmount,
-        debtAmount: debt ? debt.amount : 0,
-        status: SaleStatus.COMPLETED,
-        note: dto.note ?? null,
-        customerName:
-          dto.customerName?.trim() || debt?.customerName?.trim() || null,
-        customerPhone: dto.customerPhone?.trim() || debt?.customerPhone || null,
-        soldBy: userId,
-      });
+      })
+      .andWhere('phone.deleted_at IS NULL')
+      .getOne();
 
-      await manager.getRepository(SaleItem).save({
-        shopId,
-        saleId: sale.id,
+    if (!phone) {
+      throw BusinessException.notFound('Phone not found');
+    }
+    if (phone.status !== PhoneStatus.IN_STOCK) {
+      throw BusinessException.conflict(
+        ErrorCode.PHONE_ALREADY_SOLD,
+        'This phone has already been sold',
+      );
+    }
+
+    phone.status = PhoneStatus.SOLD;
+    await manager.getRepository(Phone).save(phone);
+
+    const lineTotal = this.round2(line.unitPrice);
+    return {
+      lineTotal,
+      item: {
+        itemType: SaleItemType.PHONE,
+        phoneId: phone.id,
+        accessoryId: null,
+        quantity: 1,
+        unitPrice: line.unitPrice,
+        costPrice: phone.purchasePrice,
+        lineTotal,
+      },
+    };
+  }
+
+  /**
+   * Lock an accessory + its chosen batch, consume from that batch (exact
+   * batch cost), recalc the accessory, and shape the sale-item line.
+   */
+  private async buildAccessoryLine(
+    manager: EntityManager,
+    shopId: string,
+    line: SaleLineDto,
+    stockEntryIdsSeen: Set<string>,
+  ): Promise<{ item: Partial<SaleItem>; lineTotal: number }> {
+    if (!line.accessoryId || !line.stockEntryId || !line.quantity) {
+      throw BusinessException.badRequest(
+        ErrorCode.SALE_LINE_INVALID,
+        'accessoryId, stockEntryId and quantity are required for an accessory line',
+      );
+    }
+    if (stockEntryIdsSeen.has(line.stockEntryId)) {
+      throw BusinessException.badRequest(
+        ErrorCode.SALE_LINE_INVALID,
+        'The same stock batch cannot appear twice in one sale — combine the quantities',
+      );
+    }
+    stockEntryIdsSeen.add(line.stockEntryId);
+
+    const accessory = await this.accessories.lockAccessory(
+      manager,
+      shopId,
+      line.accessoryId,
+    );
+
+    const { cost } = await this.accessories.consumeLayer(
+      manager,
+      accessory,
+      line.stockEntryId,
+      line.quantity,
+    );
+    await this.accessories.recalcAccessory(manager, accessory);
+
+    const lineTotal = this.round2(line.unitPrice * line.quantity);
+    return {
+      lineTotal,
+      item: {
         itemType: SaleItemType.ACCESSORY,
         phoneId: null,
         accessoryId: accessory.id,
-        quantity: dto.quantity,
-        unitPrice,
-        costPrice: accessory.purchasePrice,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        costPrice: cost,
         lineTotal,
-        returnedQuantity: 0,
-      });
-
-      accessory.quantity -= dto.quantity;
-      await manager.getRepository(Accessory).save(accessory);
-
-      if (debt) {
-        await this.createDebt(manager, shopId, sale.id, debt);
-      }
-
-      return sale.id;
-    });
-
-    return this.findOne(shopId, saleId);
+      },
+    };
   }
 
   // ---------------------------------------------------------------------------
@@ -251,7 +299,7 @@ export class SalesService {
         );
       }
 
-      await manager.getRepository(SaleReturn).save({
+      const saleReturn = await manager.getRepository(SaleReturn).save({
         shopId,
         saleId: sale.id,
         saleItemId: item.id,
@@ -273,13 +321,20 @@ export class SalesService {
             { status: PhoneStatus.IN_STOCK },
           );
       } else if (item.itemType === SaleItemType.ACCESSORY && item.accessoryId) {
-        await manager
-          .getRepository(Accessory)
-          .increment(
-            { id: item.accessoryId, shopId },
-            'quantity',
-            dto.quantity,
-          );
+        // Returned units re-enter as their own FIFO layer, valued at the cost
+        // they were sold at (the sale item's blended snapshot).
+        const accessory = await this.accessories.lockAccessory(
+          manager,
+          shopId,
+          item.accessoryId,
+        );
+        await this.accessories.addReturnLayer(
+          manager,
+          accessory,
+          dto.quantity,
+          item.costPrice,
+          saleReturn.id,
+        );
       }
 
       // Reduce an OPEN debt by the refunded amount, floored at 0.

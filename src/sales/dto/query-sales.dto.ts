@@ -1,10 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
-import {
-  DateRangeQueryDto,
-  PaginationQueryDto,
-} from '../../common';
+import { DateRangeQueryDto, PaginationQueryDto } from '../../common';
 import { IntersectionType } from '@nestjs/swagger';
 import { SaleType } from '../entities/sale.entity';
 

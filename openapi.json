@@ -952,6 +952,14 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "available",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -974,7 +982,7 @@
             "access-token": []
           }
         ],
-        "summary": "List stock intake history",
+        "summary": "List stock intake history. ?available=true → only batches with units left (oldest-first), for the sale batch picker",
         "tags": [
           "accessories"
         ]
@@ -1262,7 +1270,8 @@
               "type": "string",
               "enum": [
                 "PHONE",
-                "ACCESSORY"
+                "ACCESSORY",
+                "MIXED"
               ]
             }
           },
@@ -1299,6 +1308,41 @@
         "tags": [
           "sales"
         ]
+      },
+      "post": {
+        "operationId": "SalesController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSaleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create a sale bundling any mix of phones + accessories (optional debt). Each accessory line picks the stock batch to sell from.",
+        "tags": [
+          "sales"
+        ]
       }
     },
     "/sales/{id}": {
@@ -1332,80 +1376,6 @@
           }
         ],
         "summary": "Get one sale with items, product snapshot & debt",
-        "tags": [
-          "sales"
-        ]
-      }
-    },
-    "/sales/phone": {
-      "post": {
-        "operationId": "SalesController_sellPhone",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SellPhoneDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Sell a phone (optional debt)",
-        "tags": [
-          "sales"
-        ]
-      }
-    },
-    "/sales/accessory": {
-      "post": {
-        "operationId": "SalesController_sellAccessory",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SellAccessoryDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SaleResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Sell accessories (optional debt)",
         "tags": [
           "sales"
         ]
@@ -2971,6 +2941,10 @@
           "quantity": {
             "type": "number"
           },
+          "remainingQuantity": {
+            "type": "number",
+            "description": "Units from this batch still on hand (FIFO)"
+          },
           "purchasePrice": {
             "type": "number"
           },
@@ -2986,6 +2960,7 @@
         "required": [
           "id",
           "quantity",
+          "remainingQuantity",
           "purchasePrice",
           "createdAt"
         ]
@@ -3009,6 +2984,10 @@
           "quantity": {
             "type": "number"
           },
+          "remaining": {
+            "type": "number",
+            "description": "Units from this intake still on hand (FIFO)"
+          },
           "purchasePrice": {
             "type": "number"
           },
@@ -3021,6 +3000,7 @@
           "accessoryId",
           "name",
           "quantity",
+          "remaining",
           "purchasePrice",
           "lineTotal"
         ]
@@ -3265,7 +3245,8 @@
             "type": "string",
             "enum": [
               "PHONE",
-              "ACCESSORY"
+              "ACCESSORY",
+              "MIXED"
             ]
           },
           "totalAmount": {
@@ -3336,6 +3317,44 @@
           "items"
         ]
       },
+      "SaleLineDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "PHONE",
+              "ACCESSORY"
+            ]
+          },
+          "phoneId": {
+            "type": "string",
+            "description": "Required when type = PHONE"
+          },
+          "accessoryId": {
+            "type": "string",
+            "description": "Required when type = ACCESSORY"
+          },
+          "stockEntryId": {
+            "type": "string",
+            "description": "Required when type = ACCESSORY — the stock batch (prixod layer) to sell from"
+          },
+          "quantity": {
+            "type": "number",
+            "example": 2,
+            "description": "Units to sell (ACCESSORY only; phones are always 1)"
+          },
+          "unitPrice": {
+            "type": "number",
+            "example": 25000,
+            "description": "Negotiated unit sale price"
+          }
+        },
+        "required": [
+          "type",
+          "unitPrice"
+        ]
+      },
       "DebtInputDto": {
         "type": "object",
         "properties": {
@@ -3366,16 +3385,15 @@
           "customerPhone"
         ]
       },
-      "SellPhoneDto": {
+      "CreateSaleDto": {
         "type": "object",
         "properties": {
-          "phoneId": {
-            "type": "string"
-          },
-          "price": {
-            "type": "number",
-            "example": 3000000,
-            "description": "Negotiated sale price"
+          "items": {
+            "description": "At least one line",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SaleLineDto"
+            }
           },
           "note": {
             "type": "string"
@@ -3395,45 +3413,7 @@
           }
         },
         "required": [
-          "phoneId",
-          "price"
-        ]
-      },
-      "SellAccessoryDto": {
-        "type": "object",
-        "properties": {
-          "accessoryId": {
-            "type": "string"
-          },
-          "quantity": {
-            "type": "number",
-            "example": 2
-          },
-          "unitPrice": {
-            "type": "number",
-            "example": 25000,
-            "description": "Defaults to the accessory salePrice when omitted"
-          },
-          "note": {
-            "type": "string"
-          },
-          "customerName": {
-            "type": "string",
-            "example": "Ali Valiyev",
-            "description": "Optional buyer name for follow-up (not required)."
-          },
-          "customerPhone": {
-            "type": "string",
-            "example": "+998901234567",
-            "description": "Optional buyer phone for follow-up (not required)."
-          },
-          "debt": {
-            "$ref": "#/components/schemas/DebtInputDto"
-          }
-        },
-        "required": [
-          "accessoryId",
-          "quantity"
+          "items"
         ]
       },
       "CreateReturnDto": {

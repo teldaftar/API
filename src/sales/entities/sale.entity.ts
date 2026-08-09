@@ -5,6 +5,8 @@ import { SaleItem } from './sale-item.entity';
 export enum SaleType {
   PHONE = 'PHONE',
   ACCESSORY = 'ACCESSORY',
+  /** A sale that bundles both phones and accessories in one transaction. */
+  MIXED = 'MIXED',
 }
 
 export enum SaleStatus {

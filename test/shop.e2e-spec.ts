@@ -36,6 +36,19 @@ describe('Shop backend (e2e)', () => {
     return d.toISOString().slice(0, 10);
   };
 
+  /** Oldest available stock batch (layer) id for an accessory — the seller
+   * picks a batch to sell from, so sale lines need one. */
+  const firstBatchId = async (
+    token: string,
+    accessoryId: string,
+  ): Promise<string> => {
+    const res = await api()
+      .get(`/api/accessories/${accessoryId}/stock?available=true`)
+      .set(auth(token))
+      .expect(200);
+    return res.body[0].id as string;
+  };
+
   beforeAll(async () => {
     const ctx = await createTestApp();
     app = ctx.app;
@@ -100,11 +113,10 @@ describe('Shop backend (e2e)', () => {
       .expect(201);
 
     const sale = await api()
-      .post('/api/sales/phone')
+      .post('/api/sales')
       .set(auth(a.accessToken))
       .send({
-        phoneId: phone.body.id,
-        price: 3000000,
+        items: [{ type: 'PHONE', phoneId: phone.body.id, unitPrice: 3000000 }],
         debt: {
           amount: 1000000,
           dueDate: tomorrow(),
@@ -158,11 +170,10 @@ describe('Shop backend (e2e)', () => {
       .expect(201);
 
     const res = await api()
-      .post('/api/sales/phone')
+      .post('/api/sales')
       .set(auth(a.accessToken))
       .send({
-        phoneId: phone.body.id,
-        price: 1000000,
+        items: [{ type: 'PHONE', phoneId: phone.body.id, unitPrice: 1000000 }],
         debt: {
           amount: 2000000,
           dueDate: tomorrow(),
@@ -183,10 +194,21 @@ describe('Shop backend (e2e)', () => {
       .send({ name: 'Case', purchasePrice: 10000, quantity: 10, salePrice: 25000 })
       .expect(201);
 
+    const batchId = await firstBatchId(a.accessToken, accessory.body.id);
     const sale = await api()
-      .post('/api/sales/accessory')
+      .post('/api/sales')
       .set(auth(a.accessToken))
-      .send({ accessoryId: accessory.body.id, quantity: 2 })
+      .send({
+        items: [
+          {
+            type: 'ACCESSORY',
+            accessoryId: accessory.body.id,
+            stockEntryId: batchId,
+            quantity: 2,
+            unitPrice: 25000,
+          },
+        ],
+      })
       .expect(201);
     const saleItemId = sale.body.items[0].id;
 
@@ -222,10 +244,21 @@ describe('Shop backend (e2e)', () => {
       .send({ name: 'Charger', purchasePrice: 20000, quantity: 3, salePrice: 40000 })
       .expect(201);
 
+    const batchId = await firstBatchId(a.accessToken, accessory.body.id);
     const res = await api()
-      .post('/api/sales/accessory')
+      .post('/api/sales')
       .set(auth(a.accessToken))
-      .send({ accessoryId: accessory.body.id, quantity: 5 })
+      .send({
+        items: [
+          {
+            type: 'ACCESSORY',
+            accessoryId: accessory.body.id,
+            stockEntryId: batchId,
+            quantity: 5,
+            unitPrice: 40000,
+          },
+        ],
+      })
       .expect(409);
     expect(res.body.code).toBe('INSUFFICIENT_STOCK');
     expect(res.body.details.available).toBe(3);
@@ -296,16 +329,37 @@ describe('Shop backend (e2e)', () => {
       .expect(201);
     const accId = acc.body.id;
 
-    // Sell 4 @ 7000 and 10 @ 10000 → 14 sold total.
+    // Sell 4 @ 7000 and 10 @ 10000 → 14 sold total (both from the opening batch).
+    const batchId = await firstBatchId(a.accessToken, accId);
     await api()
-      .post('/api/sales/accessory')
+      .post('/api/sales')
       .set(auth(a.accessToken))
-      .send({ accessoryId: accId, quantity: 4, unitPrice: 7000 })
+      .send({
+        items: [
+          {
+            type: 'ACCESSORY',
+            accessoryId: accId,
+            stockEntryId: batchId,
+            quantity: 4,
+            unitPrice: 7000,
+          },
+        ],
+      })
       .expect(201);
     await api()
-      .post('/api/sales/accessory')
+      .post('/api/sales')
       .set(auth(a.accessToken))
-      .send({ accessoryId: accId, quantity: 10, unitPrice: 10000 })
+      .send({
+        items: [
+          {
+            type: 'ACCESSORY',
+            accessoryId: accId,
+            stockEntryId: batchId,
+            quantity: 10,
+            unitPrice: 10000,
+          },
+        ],
+      })
       .expect(201);
 
     // Sold list: one row, 14 units sold.
@@ -340,6 +394,56 @@ describe('Shop backend (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
+  it('allows selling below cost and reflects the loss as negative profit', async () => {
+    const a = await registerShop(app, 'loss');
+
+    // Phone bought 2,000,000, sold 1,800,000 → loss 200,000.
+    const phone = await api()
+      .post('/api/phones')
+      .set(auth(a.accessToken))
+      .send({ name: 'Old phone', purchasePrice: 2000000 })
+      .expect(201);
+
+    // Accessory bought 10,000, sell 2 @ 6,000 → loss 8,000.
+    const acc = await api()
+      .post('/api/accessories')
+      .set(auth(a.accessToken))
+      .send({ name: 'Slow mover', purchasePrice: 10000, quantity: 5, salePrice: 8000 })
+      .expect(201);
+    const batchId = await firstBatchId(a.accessToken, acc.body.id);
+
+    const sale = await api()
+      .post('/api/sales')
+      .set(auth(a.accessToken))
+      .send({
+        items: [
+          { type: 'PHONE', phoneId: phone.body.id, unitPrice: 1800000 },
+          {
+            type: 'ACCESSORY',
+            accessoryId: acc.body.id,
+            stockEntryId: batchId,
+            quantity: 2,
+            unitPrice: 6000,
+          },
+        ],
+      })
+      .expect(201);
+
+    // Sale-level profit is negative: -200,000 + -8,000.
+    expect(sale.body.profit).toBe(-208000);
+
+    const stats = await api()
+      .get('/api/statistics/summary')
+      .set(auth(a.accessToken))
+      .expect(200);
+    expect(stats.body.phones.profit).toBe(-200000);
+    expect(stats.body.accessories.soldAmount).toBe(12000);
+    expect(stats.body.accessories.soldCostAmount).toBe(20000);
+    expect(stats.body.accessories.profit).toBe(-8000);
+    expect(stats.body.totals.grossProfit).toBe(-208000);
+  });
+
+  // ---------------------------------------------------------------------------
   it('computes the statistics summary from SQL aggregates', async () => {
     const a = await registerShop(app, 'stats');
 
@@ -349,11 +453,6 @@ describe('Shop backend (e2e)', () => {
       .set(auth(a.accessToken))
       .send({ name: 'Pixel', imei: '444444444444', purchasePrice: 2000000 })
       .expect(201);
-    await api()
-      .post('/api/sales/phone')
-      .set(auth(a.accessToken))
-      .send({ phoneId: phone.body.id, price: 3000000 })
-      .expect(201);
 
     // An accessory bought for 10,000, sell 2 @ 25,000 (profit 30,000).
     const acc = await api()
@@ -361,10 +460,24 @@ describe('Shop backend (e2e)', () => {
       .set(auth(a.accessToken))
       .send({ name: 'Cable', purchasePrice: 10000, quantity: 10, salePrice: 25000 })
       .expect(201);
+    const batchId = await firstBatchId(a.accessToken, acc.body.id);
+
+    // One MIXED sale bundling the phone and the accessory line.
     await api()
-      .post('/api/sales/accessory')
+      .post('/api/sales')
       .set(auth(a.accessToken))
-      .send({ accessoryId: acc.body.id, quantity: 2 })
+      .send({
+        items: [
+          { type: 'PHONE', phoneId: phone.body.id, unitPrice: 3000000 },
+          {
+            type: 'ACCESSORY',
+            accessoryId: acc.body.id,
+            stockEntryId: batchId,
+            quantity: 2,
+            unitPrice: 25000,
+          },
+        ],
+      })
       .expect(201);
 
     // An expense of 100,000.

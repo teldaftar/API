@@ -1,12 +1,10 @@
-import { Column, Entity, Index, OneToMany } from 'typeorm';
+import { Column, Entity, Index } from 'typeorm';
 import { UuidEntity, numericTransformer } from '../../common';
-import { StockReceiptItem } from './stock-receipt-item.entity';
 
 /**
  * A grouped accessory intake ("prixod / kirim") — one document covering many
- * accessory lines received together. Each line also writes an
- * `accessory_stock_entries` row (linked by `receipt_id`) and bumps the
- * accessory's running quantity, so stats keep reading intake from that log.
+ * accessory lines received together. Its lines ARE the FIFO layers it created:
+ * `accessory_stock_entries` rows tagged with this receipt's `receipt_id`.
  */
 @Entity('stock_receipts')
 @Index('idx_stock_receipts_shop_received', ['shopId', 'receivedAt'])
@@ -48,7 +46,4 @@ export class StockReceipt extends UuidEntity {
 
   @Column({ name: 'created_by', type: 'uuid' })
   createdBy: string;
-
-  @OneToMany(() => StockReceiptItem, (item) => item.receipt)
-  items: StockReceiptItem[];
 }

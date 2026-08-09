@@ -135,13 +135,21 @@ export class AccessoriesController {
   }
 
   @Get(':id/stock')
-  @ApiOperation({ summary: 'List stock intake history' })
+  @ApiOperation({
+    summary:
+      'List stock intake history. ?available=true → only batches with units left (oldest-first), for the sale batch picker',
+  })
   @ApiOkResponse({ type: [StockEntryResponseDto] })
   async listStock(
     @CurrentShop() shopId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @Query('available') available?: string,
   ): Promise<StockEntryResponseDto[]> {
-    const entries = await this.service.listStock(shopId, id);
+    const entries = await this.service.listStock(
+      shopId,
+      id,
+      available === 'true',
+    );
     return entries.map(StockEntryResponseDto.from);
   }
 }

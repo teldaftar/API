@@ -8,10 +8,7 @@ import {
   todayLocalDateString,
 } from '../common';
 import { QueryStatisticsDto } from './dto/query-statistics.dto';
-import {
-  DailyStatRowDto,
-  StatisticsSummaryDto,
-} from './dto/statistics.dto';
+import { DailyStatRowDto, StatisticsSummaryDto } from './dto/statistics.dto';
 
 /** Coerce a pg numeric/bigint (returned as string) to number. */
 function num(value: unknown): number {
@@ -136,6 +133,7 @@ export class StatisticsService {
              COALESCE(SUM(quantity * purchase_price), 0) AS purchased_amount
       FROM accessory_stock_entries
       WHERE shop_id = $1 AND created_at >= $2 AND created_at < $3
+        AND sale_return_id IS NULL
       `,
       [shopId, range.fromUtc, range.toExclusiveUtc],
     );
@@ -152,12 +150,13 @@ export class StatisticsService {
       [shopId, range.fromUtc, range.toExclusiveUtc],
     );
 
+    // Remaining stock valued FIFO — sum each layer's on-hand units at its cost.
     const [accStock] = await this.dataSource.query(
       `
-      SELECT COALESCE(SUM(quantity), 0) AS remaining_qty,
-             COALESCE(SUM(quantity * purchase_price), 0) AS remaining_cost_amount
-      FROM accessories
-      WHERE shop_id = $1 AND deleted_at IS NULL
+      SELECT COALESCE(SUM(remaining_quantity), 0) AS remaining_qty,
+             COALESCE(SUM(remaining_quantity * purchase_price), 0) AS remaining_cost_amount
+      FROM accessory_stock_entries
+      WHERE shop_id = $1
       `,
       [shopId],
     );

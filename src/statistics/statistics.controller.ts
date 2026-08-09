@@ -8,10 +8,7 @@ import {
 import { CurrentShop } from '../common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { QueryStatisticsDto } from './dto/query-statistics.dto';
-import {
-  DailyStatRowDto,
-  StatisticsSummaryDto,
-} from './dto/statistics.dto';
+import { DailyStatRowDto, StatisticsSummaryDto } from './dto/statistics.dto';
 import { StatisticsService } from './statistics.service';
 
 @ApiTags('statistics')

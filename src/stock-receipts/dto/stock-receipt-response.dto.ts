@@ -7,6 +7,8 @@ export class StockReceiptItemResponseDto {
   @ApiProperty() name: string;
   @ApiPropertyOptional({ nullable: true }) imageUrl: string | null;
   @ApiProperty() quantity: number;
+  @ApiProperty({ description: 'Units from this intake still on hand (FIFO)' })
+  remaining: number;
   @ApiProperty() purchasePrice: number;
   @ApiProperty() lineTotal: number;
 }

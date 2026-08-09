@@ -31,7 +31,10 @@ export class DebtInputDto {
   @MaxLength(120)
   customerName: string;
 
-  @ApiProperty({ example: '998901234567', description: 'Normalised to 998XXXXXXXXX' })
+  @ApiProperty({
+    example: '998901234567',
+    description: 'Normalised to 998XXXXXXXXX',
+  })
   @IsString()
   @MinLength(7)
   @MaxLength(20)

@@ -17,11 +17,10 @@ import {
 import { CurrentShop, CurrentUser, PaginatedResult } from '../common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CreateReturnDto } from './dto/create-return.dto';
+import { CreateSaleDto } from './dto/create-sale.dto';
 import { QuerySalesDto } from './dto/query-sales.dto';
 import { SaleResponseDto } from './dto/sale-response.dto';
 import { SaleReturnResponseDto } from './dto/sale-return-response.dto';
-import { SellAccessoryDto } from './dto/sell-accessory.dto';
-import { SellPhoneDto } from './dto/sell-phone.dto';
 import { SalesService } from './sales.service';
 
 @ApiTags('sales')
@@ -50,26 +49,18 @@ export class SalesController {
     return this.salesService.findOne(shopId, id);
   }
 
-  @Post('phone')
-  @ApiOperation({ summary: 'Sell a phone (optional debt)' })
+  @Post()
+  @ApiOperation({
+    summary:
+      'Create a sale bundling any mix of phones + accessories (optional debt). Each accessory line picks the stock batch to sell from.',
+  })
   @ApiOkResponse({ type: SaleResponseDto })
-  sellPhone(
+  create(
     @CurrentShop() shopId: string,
     @CurrentUser('userId') userId: string,
-    @Body() dto: SellPhoneDto,
+    @Body() dto: CreateSaleDto,
   ): Promise<SaleResponseDto> {
-    return this.salesService.sellPhone(shopId, userId, dto);
-  }
-
-  @Post('accessory')
-  @ApiOperation({ summary: 'Sell accessories (optional debt)' })
-  @ApiOkResponse({ type: SaleResponseDto })
-  sellAccessory(
-    @CurrentShop() shopId: string,
-    @CurrentUser('userId') userId: string,
-    @Body() dto: SellAccessoryDto,
-  ): Promise<SaleResponseDto> {
-    return this.salesService.sellAccessory(shopId, userId, dto);
+    return this.salesService.createSale(shopId, userId, dto);
   }
 
   @Post(':id/return')

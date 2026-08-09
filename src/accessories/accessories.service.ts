@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
-import { BusinessException, PaginatedResult, paginate } from '../common';
+import { DataSource, EntityManager, MoreThan, Repository } from 'typeorm';
+import {
+  BusinessException,
+  ErrorCode,
+  PaginatedResult,
+  paginate,
+} from '../common';
 import { UploadsService } from '../uploads/uploads.service';
 import { CreateAccessoryDto } from './dto/create-accessory.dto';
 import { QueryAccessoriesDto } from './dto/query-accessories.dto';
@@ -198,44 +203,133 @@ export class AccessoriesService {
       shopId: accessory.shopId,
       accessoryId: accessory.id,
       receiptId,
+      saleReturnId: null,
       quantity,
+      remainingQuantity: quantity,
       purchasePrice,
       note,
     });
-    accessory.quantity += quantity;
-    accessory.purchasePrice = purchasePrice;
-    await manager.getRepository(Accessory).save(accessory);
+    await this.recalcAccessory(manager, accessory);
   }
 
   /**
-   * Recompute an accessory's `purchasePrice` from its most recent remaining
-   * stock entry (max createdAt). Used after a stock receipt is edited/deleted,
-   * where entries may have been replaced or removed. No-op if none remain.
-   * Mutates and saves the passed `accessory`.
+   * Consume `quantity` units from ONE explicitly chosen stock layer (batch),
+   * decrementing its `remainingQuantity`. The seller picks which batch to sell
+   * from, so the cost is that batch's exact `purchasePrice` (no blending).
+   * Locks the layer row; caller should have locked the accessory and must call
+   * {@link recalcAccessory} afterwards.
    */
-  async refreshLatestCost(
+  async consumeLayer(
+    manager: EntityManager,
+    accessory: Accessory,
+    stockEntryId: string,
+    quantity: number,
+  ): Promise<{ cost: number }> {
+    const layer = await manager
+      .getRepository(AccessoryStockEntry)
+      .createQueryBuilder('e')
+      .setLock('pessimistic_write')
+      .where(
+        'e.id = :id AND e.accessory_id = :accId AND e.shop_id = :shopId',
+        { id: stockEntryId, accId: accessory.id, shopId: accessory.shopId },
+      )
+      .getOne();
+
+    if (!layer) {
+      throw BusinessException.notFound('Stock batch not found');
+    }
+    if (layer.remainingQuantity < quantity) {
+      throw BusinessException.conflict(
+        ErrorCode.INSUFFICIENT_STOCK,
+        'Not enough stock in the selected batch',
+        { available: layer.remainingQuantity },
+      );
+    }
+
+    layer.remainingQuantity -= quantity;
+    await manager.getRepository(AccessoryStockEntry).save(layer);
+    return { cost: layer.purchasePrice };
+  }
+
+  /**
+   * Returned goods re-enter stock as their own FIFO layer, valued at the cost
+   * they were sold at (`unitCost`) and tagged with the return so they're
+   * excluded from "purchased" stats. Caller should have locked the accessory.
+   */
+  async addReturnLayer(
+    manager: EntityManager,
+    accessory: Accessory,
+    quantity: number,
+    unitCost: number,
+    saleReturnId: string,
+  ): Promise<void> {
+    await manager.getRepository(AccessoryStockEntry).save({
+      shopId: accessory.shopId,
+      accessoryId: accessory.id,
+      receiptId: null,
+      saleReturnId,
+      quantity,
+      remainingQuantity: quantity,
+      purchasePrice: unitCost,
+      note: 'Qaytarilgan tovar',
+    });
+    await this.recalcAccessory(manager, accessory);
+  }
+
+  /**
+   * Re-derive an accessory's denormalized `quantity` (Σ remaining across all
+   * layers) and `purchasePrice` (the oldest remaining layer's cost — what the
+   * next sale will draw from under FIFO). Mutates and saves the accessory.
+   */
+  async recalcAccessory(
     manager: EntityManager,
     accessory: Accessory,
   ): Promise<void> {
-    const latest = await manager
-      .getRepository(AccessoryStockEntry)
+    const repo = manager.getRepository(AccessoryStockEntry);
+    const sum = await repo
       .createQueryBuilder('e')
+      .select('COALESCE(SUM(e.remaining_quantity), 0)', 'qty')
       .where('e.accessory_id = :id AND e.shop_id = :shopId', {
         id: accessory.id,
         shopId: accessory.shopId,
       })
-      .orderBy('e.created_at', 'DESC')
-      .addOrderBy('e.id', 'DESC')
+      .getRawOne<{ qty: string }>();
+    accessory.quantity = num(sum?.qty);
+
+    const oldest = await repo
+      .createQueryBuilder('e')
+      .where(
+        'e.accessory_id = :id AND e.shop_id = :shopId AND e.remaining_quantity > 0',
+        { id: accessory.id, shopId: accessory.shopId },
+      )
+      .orderBy('e.created_at', 'ASC')
+      .addOrderBy('e.id', 'ASC')
       .limit(1)
       .getOne();
-    if (latest) {
-      accessory.purchasePrice = latest.purchasePrice;
-      await manager.getRepository(Accessory).save(accessory);
+    if (oldest) {
+      accessory.purchasePrice = oldest.purchasePrice;
     }
+
+    await manager.getRepository(Accessory).save(accessory);
   }
 
-  async listStock(shopId: string, id: string): Promise<AccessoryStockEntry[]> {
+  /**
+   * Stock intake history for an accessory. With `onlyAvailable`, returns just
+   * the batches that still have units on hand, oldest-first — the shape the
+   * sale UI needs so the seller can pick which batch (price) to sell from.
+   */
+  async listStock(
+    shopId: string,
+    id: string,
+    onlyAvailable = false,
+  ): Promise<AccessoryStockEntry[]> {
     await this.findOne(shopId, id); // tenant-scoped existence check
+    if (onlyAvailable) {
+      return this.stockEntries.find({
+        where: { accessoryId: id, shopId, remainingQuantity: MoreThan(0) },
+        order: { createdAt: 'ASC' },
+      });
+    }
     return this.stockEntries.find({
       where: { accessoryId: id, shopId },
       order: { createdAt: 'DESC' },

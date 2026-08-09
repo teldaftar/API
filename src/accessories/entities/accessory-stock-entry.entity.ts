@@ -18,8 +18,21 @@ export class AccessoryStockEntry extends UuidEntity {
   @Column({ name: 'receipt_id', type: 'uuid', nullable: true })
   receiptId: string | null;
 
+  /**
+   * Set when this layer is returned goods (created by a sale return), not a
+   * purchase — excluded from "purchased" stats. Its `purchasePrice` is the
+   * blended cost the units were sold at.
+   */
+  @Column({ name: 'sale_return_id', type: 'uuid', nullable: true })
+  saleReturnId: string | null;
+
+  /** Units received in this intake. */
   @Column({ type: 'int' })
   quantity: number;
+
+  /** Units from this layer still on hand (FIFO). `quantity − consumed`. */
+  @Column({ name: 'remaining_quantity', type: 'int' })
+  remainingQuantity: number;
 
   @Column({
     name: 'purchase_price',

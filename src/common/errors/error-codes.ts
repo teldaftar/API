@@ -30,6 +30,10 @@ export enum ErrorCode {
   // Stock receipts (prixod)
   RECEIPT_LINE_INVALID = 'RECEIPT_LINE_INVALID',
 
+  // Sales
+  SALE_LINE_INVALID = 'SALE_LINE_INVALID',
+  SALE_EMPTY = 'SALE_EMPTY',
+
   // Debts
   DEBT_EXCEEDS_TOTAL = 'DEBT_EXCEEDS_TOTAL',
   DUE_DATE_IN_PAST = 'DUE_DATE_IN_PAST',

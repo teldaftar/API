@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
+import { AccessoriesModule } from '../accessories/accessories.module';
 import { Accessory } from '../accessories/entities/accessory.entity';
 import { Debt } from '../debts/entities/debt.entity';
 import { DebtPayment } from '../debts/entities/debt-payment.entity';
@@ -25,6 +26,7 @@ import { SalesService } from './sales.service';
       Accessory,
     ]),
     AuthModule,
+    AccessoriesModule,
   ],
   controllers: [SalesController],
   providers: [SalesService],
