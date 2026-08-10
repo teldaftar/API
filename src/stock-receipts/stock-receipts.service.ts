@@ -75,6 +75,13 @@ export class StockReceiptsService {
             )
           : await this.createInlineAccessory(manager, shopId, line);
 
+        // Update the accessory's default sale price if the line carries one
+        // (new accessories already took it via createInlineAccessory). The
+        // recalc inside applyIntake persists it.
+        if (line.accessoryId && line.salePrice !== undefined) {
+          accessory.salePrice = line.salePrice;
+        }
+
         await this.accessories.applyIntake(
           manager,
           accessory,
@@ -141,6 +148,12 @@ export class StockReceiptsService {
           : await this.createInlineAccessory(manager, shopId, line);
         touched.set(accessory.id, accessory);
         keptAccessoryIds.add(accessory.id);
+
+        // Update the accessory's default sale price if provided (persisted by
+        // the recalcAccessory pass below).
+        if (line.accessoryId && line.salePrice !== undefined) {
+          accessory.salePrice = line.salePrice;
+        }
 
         const layer = layerByAcc.get(accessory.id);
         if (layer) {
@@ -333,6 +346,7 @@ export class StockReceiptsService {
         quantity: l.quantity,
         remaining: l.remainingQuantity,
         purchasePrice: l.purchasePrice,
+        salePrice: acc?.salePrice ?? null,
         lineTotal: this.round2(l.purchasePrice * l.quantity),
       };
     });
@@ -349,7 +363,8 @@ export class StockReceiptsService {
       shopId,
       name: line.newAccessory!.name.trim(),
       purchasePrice: line.purchasePrice,
-      salePrice: line.newAccessory!.salePrice ?? null,
+      // Line-level salePrice wins; fall back to the nested one.
+      salePrice: line.salePrice ?? line.newAccessory!.salePrice ?? null,
       quantity: 0,
       imageUrl: line.newAccessory!.imageUrl ?? null,
       note: line.newAccessory!.note ?? null,

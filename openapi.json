@@ -2991,6 +2991,11 @@
           "purchasePrice": {
             "type": "number"
           },
+          "salePrice": {
+            "type": "object",
+            "nullable": true,
+            "description": "The accessory's current default sale price"
+          },
           "lineTotal": {
             "type": "number"
           }
@@ -3104,6 +3109,11 @@
             "type": "number",
             "example": 12000,
             "description": "Unit cost of this intake. 0 allowed (free intake)."
+          },
+          "salePrice": {
+            "type": "number",
+            "example": 25000,
+            "description": "Default sale price to set on the accessory. Updates the accessory's current salePrice (works for both existing and new accessories). Omit to leave it unchanged."
           }
         },
         "required": [

@@ -76,6 +76,17 @@ export class StockReceiptLineDto {
   @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0)
   purchasePrice: number;
+
+  @ApiPropertyOptional({
+    example: 25000,
+    description:
+      "Default sale price to set on the accessory. Updates the accessory's current salePrice (works for both existing and new accessories). Omit to leave it unchanged.",
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @IsPositive()
+  salePrice?: number;
 }
 
 export class CreateStockReceiptDto {

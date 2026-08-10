@@ -10,6 +10,11 @@ export class StockReceiptItemResponseDto {
   @ApiProperty({ description: 'Units from this intake still on hand (FIFO)' })
   remaining: number;
   @ApiProperty() purchasePrice: number;
+  @ApiPropertyOptional({
+    nullable: true,
+    description: "The accessory's current default sale price",
+  })
+  salePrice: number | null;
   @ApiProperty() lineTotal: number;
 }
 
