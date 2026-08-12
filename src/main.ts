@@ -15,6 +15,12 @@ async function bootstrap(): Promise<void> {
 
   app.useLogger(app.get(Logger));
 
+  // Behind a reverse proxy (nginx). Trust the first proxy hop so `req.ip`
+  // resolves to the real client IP (from X-Forwarded-For) instead of the
+  // proxy's address — otherwise the throttler buckets every user under one IP
+  // and returns 429 (Too Many Requests) for everyone.
+  app.set('trust proxy', 1);
+
   const config = app.get(ConfigService);
 
   const corsOrigins = config
