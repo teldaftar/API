@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, In, Repository } from 'typeorm';
+import { Brackets, DataSource, In, Repository } from 'typeorm';
 import {
   BusinessException,
   ErrorCode,
@@ -47,6 +47,7 @@ export class PhonesService {
     @InjectRepository(DebtPayment)
     private readonly debtPayments: Repository<DebtPayment>,
     private readonly uploads: UploadsService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -264,18 +265,9 @@ export class PhonesService {
   ): Promise<Phone> {
     const phone = await this.findOne(shopId, id);
 
-    if (phone.status === PhoneStatus.SOLD) {
-      // Only note / imageUrl remain editable once sold.
-      const touchesLocked = Object.keys(dto).some(
-        (k) => k !== 'note' && k !== 'imageUrl' && (dto as never)[k] !== undefined,
-      );
-      if (touchesLocked) {
-        throw BusinessException.conflict(
-          ErrorCode.PHONE_ALREADY_SOLD,
-          'A sold phone can only have its note or image edited',
-        );
-      }
-    }
+    // A sold phone is fully editable — `status` is not part of the DTO, so a
+    // sale can never be undone here. Correcting a sold phone's purchase price
+    // propagates to its sale line(s) below so profit stats stay right.
 
     if (dto.imei && dto.imei !== phone.imei) {
       await this.assertImeiFree(shopId, dto.imei, id);
@@ -283,6 +275,7 @@ export class PhonesService {
     }
 
     const previousImage = phone.imageUrl;
+    const previousPurchasePrice = phone.purchasePrice;
 
     if (dto.name !== undefined) phone.name = dto.name.trim();
     if (dto.supplierName !== undefined)
@@ -291,7 +284,8 @@ export class PhonesService {
       phone.supplierSurname = dto.supplierSurname?.trim() ?? null;
     if (dto.supplierPhone !== undefined)
       phone.supplierPhone = dto.supplierPhone?.trim() ?? null;
-    if (dto.purchasePrice !== undefined) phone.purchasePrice = dto.purchasePrice;
+    if (dto.purchasePrice !== undefined)
+      phone.purchasePrice = dto.purchasePrice;
     if (dto.listPrice !== undefined) phone.listPrice = dto.listPrice;
     if (dto.condition !== undefined) phone.condition = dto.condition;
     if (dto.usedGrade !== undefined) phone.usedGrade = dto.usedGrade;
@@ -313,7 +307,25 @@ export class PhonesService {
     if (dto.imageUrl !== undefined) phone.imageUrl = dto.imageUrl;
     if (dto.note !== undefined) phone.note = dto.note;
 
-    const saved = await this.phones.save(phone);
+    const purchasePriceChanged =
+      dto.purchasePrice !== undefined &&
+      phone.purchasePrice !== previousPurchasePrice;
+
+    const saved = await this.dataSource.transaction(async (manager) => {
+      const s = await manager.getRepository(Phone).save(phone);
+      // The sale line snapshots the phone's purchase price as `cost_price` at
+      // sale time, and profit/statistics read that snapshot — not the live
+      // phone. So a corrected purchase price must flow to this phone's sale
+      // line(s), otherwise the "purchased" total would update but profit would
+      // stay wrong. A phone is one physical unit bought once, so every sale
+      // line for it shares the same cost.
+      if (purchasePriceChanged) {
+        await manager
+          .getRepository(SaleItem)
+          .update({ phoneId: id, shopId }, { costPrice: s.purchasePrice });
+      }
+      return s;
+    });
 
     // Image was replaced/cleared → drop the now-orphaned old file.
     if (previousImage && previousImage !== saved.imageUrl) {
