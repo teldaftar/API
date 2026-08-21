@@ -21,6 +21,7 @@ import { CreateSaleDto, SaleLineDto } from './dto/create-sale.dto';
 import { DebtInputDto } from './dto/debt-input.dto';
 import { buildDebtSummary, SaleResponseDto } from './dto/sale-response.dto';
 import { QuerySalesDto } from './dto/query-sales.dto';
+import { UpdateSaleDto } from './dto/update-sale.dto';
 import { SaleCounter } from './entities/sale-counter.entity';
 import { SaleItem, SaleItemType } from './entities/sale-item.entity';
 import { SaleReturn } from './entities/sale-return.entity';
@@ -246,6 +247,155 @@ export class SalesService {
         lineTotal,
       },
     };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Editing (price correction)
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Correct the recorded price(s) of an existing sale and restate its debt.
+   * Works in every state — including sales that already have returns or debt
+   * repayments — by treating money that has actually moved as fixed facts and
+   * only re-deriving what remains:
+   *
+   * - Reprices the listed lines (cost prices are never touched) and recomputes
+   *   `totalAmount = Σ unitPrice × quantity`.
+   * - `dto.debt.amount` means the balance the customer STILL owes (outstanding).
+   *   Already-collected installments (`debt_payments`) and refunds already paid
+   *   on returns (`sale_returns`) are preserved untouched.
+   * - Re-derives the header so `paidAmount + debtAmount = totalAmount`, where
+   *   `debtAmount` (original debt) = outstanding + already-repaid, and
+   *   `paidAmount` (down payment) absorbs the rest.
+   *
+   * Statistics need no separate update — sold amount / profit are computed from
+   * `unitPrice × net`, and cash/debt from these header columns, on every read.
+   *
+   * The only hard limit: the new total cannot fall below the cash already
+   * collected on the sale (down payment + installments); refunding that
+   * difference is a separate action (→ SALE_TOTAL_BELOW_COLLECTED).
+   */
+  async updateSale(
+    shopId: string,
+    saleId: string,
+    dto: UpdateSaleDto,
+  ): Promise<SaleResponseDto> {
+    await this.dataSource.transaction(async (manager) => {
+      const sale = await manager
+        .getRepository(Sale)
+        .createQueryBuilder('sale')
+        .setLock('pessimistic_write')
+        .where('sale.id = :saleId AND sale.shop_id = :shopId', {
+          saleId,
+          shopId,
+        })
+        .getOne();
+      if (!sale) {
+        throw BusinessException.notFound('Sale not found');
+      }
+
+      const items = await manager.getRepository(SaleItem).find({
+        where: { saleId: sale.id, shopId },
+      });
+
+      // Apply the new prices to the referenced lines (any item type). Returns
+      // and their refunds stay as-is — profit re-derives from the new price.
+      const itemById = new Map(items.map((i) => [i.id, i]));
+      for (const patch of dto.items) {
+        const item = itemById.get(patch.id);
+        if (!item) {
+          throw BusinessException.badRequest(
+            ErrorCode.SALE_LINE_INVALID,
+            'Sale item does not belong to this sale',
+            { saleItemId: patch.id },
+          );
+        }
+        item.unitPrice = patch.unitPrice;
+        item.lineTotal = this.round2(patch.unitPrice * item.quantity);
+      }
+
+      const totalAmount = this.round2(
+        items.reduce((sum, i) => sum + i.lineTotal, 0),
+      );
+
+      // Existing debt + the sum of installments already collected against it.
+      const existingDebt = await manager.getRepository(Debt).findOne({
+        where: { saleId: sale.id, shopId },
+      });
+      const repaid = existingDebt
+        ? await this.sumDebtPayments(manager, shopId, existingDebt.id)
+        : 0;
+
+      let debtAmount: number;
+      if (dto.debt) {
+        // `dto.debt.amount` is the outstanding balance still owed. The most that
+        // can still be financed is what's left after already-collected cash.
+        const debt = this.validateDebt(
+          dto.debt,
+          totalAmount,
+          this.round2(totalAmount - repaid),
+        );
+        const outstanding = debt.amount;
+        debtAmount = this.round2(outstanding + repaid);
+
+        if (existingDebt) {
+          existingDebt.customerName = debt.customerName.trim();
+          existingDebt.customerPhone = debt.customerPhone;
+          existingDebt.amount = outstanding;
+          existingDebt.dueDate = debt.dueDate;
+          existingDebt.status = DebtStatus.OPEN;
+          existingDebt.paidAt = null;
+          await manager.getRepository(Debt).save(existingDebt);
+        } else {
+          await this.createDebt(manager, shopId, sale.id, debt);
+        }
+        // Mirror the buyer contact onto the sale when it has none yet.
+        sale.customerName = sale.customerName || debt.customerName.trim();
+        sale.customerPhone = sale.customerPhone || debt.customerPhone;
+      } else if (repaid > 0) {
+        // No outstanding balance requested, but installments were collected —
+        // the debt is now fully settled. Keep the payment history; the new
+        // total cannot drop below what was already collected.
+        if (totalAmount < repaid) {
+          throw BusinessException.conflict(
+            ErrorCode.SALE_TOTAL_BELOW_COLLECTED,
+            'New total is below the amount already collected on this sale; refund the difference first',
+            { collected: repaid, newTotal: totalAmount },
+          );
+        }
+        debtAmount = repaid;
+        existingDebt!.amount = 0;
+        existingDebt!.status = DebtStatus.PAID;
+        existingDebt!.paidAt = existingDebt!.paidAt ?? new Date();
+        await manager.getRepository(Debt).save(existingDebt!);
+      } else {
+        // Fully cash — no outstanding balance, no collected installments.
+        debtAmount = 0;
+        if (existingDebt) {
+          await manager.getRepository(Debt).delete({ id: existingDebt.id });
+        }
+      }
+
+      sale.totalAmount = totalAmount;
+      sale.debtAmount = debtAmount;
+      sale.paidAmount = this.round2(totalAmount - debtAmount);
+
+      // Recompute status from the (unchanged) returned quantities.
+      const fullyReturned = items.every(
+        (i) => i.returnedQuantity >= i.quantity,
+      );
+      const anyReturned = items.some((i) => i.returnedQuantity > 0);
+      sale.status = fullyReturned
+        ? SaleStatus.RETURNED
+        : anyReturned
+          ? SaleStatus.PARTIALLY_RETURNED
+          : SaleStatus.COMPLETED;
+
+      await manager.getRepository(SaleItem).save(items);
+      await manager.getRepository(Sale).save(sale);
+    });
+
+    return this.findOne(shopId, saleId);
   }
 
   // ---------------------------------------------------------------------------
@@ -649,6 +799,7 @@ export class SalesService {
   private validateDebt(
     debt: DebtInputDto,
     saleTotal: number,
+    maxAmount: number = saleTotal,
   ): DebtInputDto & { customerPhone: string } {
     if (debt.amount <= 0) {
       throw BusinessException.badRequest(
@@ -656,10 +807,11 @@ export class SalesService {
         'Debt amount must be greater than zero',
       );
     }
-    if (debt.amount > saleTotal) {
+    if (debt.amount > maxAmount) {
       throw BusinessException.badRequest(
         ErrorCode.DEBT_EXCEEDS_TOTAL,
-        'Debt amount cannot exceed the sale total',
+        'Debt amount cannot exceed the amount still financeable on this sale',
+        { maxAmount: this.round2(maxAmount) },
       );
     }
     if (!debt.customerName?.trim() || !debt.customerPhone?.trim()) {
@@ -700,6 +852,21 @@ export class SalesService {
       dueDate: debt.dueDate,
       status: DebtStatus.OPEN,
     });
+  }
+
+  /** Sum of installments collected against a debt (0 if none). */
+  private async sumDebtPayments(
+    manager: EntityManager,
+    shopId: string,
+    debtId: string,
+  ): Promise<number> {
+    const row = await manager
+      .getRepository(DebtPayment)
+      .createQueryBuilder('p')
+      .select('COALESCE(SUM(p.amount), 0)', 'sum')
+      .where('p.debt_id = :debtId AND p.shop_id = :shopId', { debtId, shopId })
+      .getRawOne<{ sum: string }>();
+    return this.round2(Number(row?.sum ?? 0));
   }
 
   private async nextSaleCode(

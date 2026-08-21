@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -20,6 +21,7 @@ import { CreateReturnDto } from './dto/create-return.dto';
 import { CreateSaleDto } from './dto/create-sale.dto';
 import { QuerySalesDto } from './dto/query-sales.dto';
 import { SaleResponseDto } from './dto/sale-response.dto';
+import { UpdateSaleDto } from './dto/update-sale.dto';
 import { SaleReturnResponseDto } from './dto/sale-return-response.dto';
 import { SalesService } from './sales.service';
 
@@ -61,6 +63,20 @@ export class SalesController {
     @Body() dto: CreateSaleDto,
   ): Promise<SaleResponseDto> {
     return this.salesService.createSale(shopId, userId, dto);
+  }
+
+  @Patch(':id')
+  @ApiOperation({
+    summary:
+      'Correct a sale: reprice lines and restate the debt split (totals & stats follow automatically). Blocked if the sale has returns or debt repayments.',
+  })
+  @ApiOkResponse({ type: SaleResponseDto })
+  update(
+    @CurrentShop() shopId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateSaleDto,
+  ): Promise<SaleResponseDto> {
+    return this.salesService.updateSale(shopId, id, dto);
   }
 
   @Post(':id/return')

@@ -1379,6 +1379,50 @@
         "tags": [
           "sales"
         ]
+      },
+      "patch": {
+        "operationId": "SalesController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSaleDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaleResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Correct a sale: reprice lines and restate the debt split (totals & stats follow automatically). Blocked if the sale has returns or debt repayments.",
+        "tags": [
+          "sales"
+        ]
       }
     },
     "/sales/{id}/return": {
@@ -3420,6 +3464,48 @@
           },
           "debt": {
             "$ref": "#/components/schemas/DebtInputDto"
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "UpdateSaleItemPriceDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Existing sale_item id to reprice"
+          },
+          "unitPrice": {
+            "type": "number",
+            "example": 1200000,
+            "description": "New unit sale price"
+          }
+        },
+        "required": [
+          "id",
+          "unitPrice"
+        ]
+      },
+      "UpdateSaleDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UpdateSaleItemPriceDto"
+            }
+          },
+          "debt": {
+            "description": "Restated debt. `amount` is the balance the customer STILL owes (outstanding). Already-collected installments and refunds are preserved. Omit or send null when nothing is owed (fully-cash / fully-settled). Editing works even with returns or prior repayments; the new total just cannot fall below cash already collected.",
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DebtInputDto"
+              }
+            ]
           }
         },
         "required": [
