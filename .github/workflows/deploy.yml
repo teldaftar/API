@@ -1,0 +1,49 @@
+name: Deploy backend
+
+# main'ga push bo'lganda avtomatik deploy.
+# Faqat kodga aloqador o'zgarishlarda ishga tushadi (docs/md o'zgarsa — yo'q).
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'openapi.json'
+  workflow_dispatch: {} # qo'lda ham ishga tushirish uchun (Actions tabidan tugma)
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false # deploylar bir-birini kesmasin, navbat bilan ketsin
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Serverga SSH orqali deploy
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true # biror qadam xato bersa — to'xta
+          script: |
+            set -e
+            cd ${{ secrets.APP_DIR }}
+
+            echo "==> Yangi kodni tortish"
+            git fetch --all
+            git reset --hard origin/main
+
+            echo "==> Bog'liqliklarni o'rnatish"
+            npm ci
+
+            echo "==> Build"
+            npm run build
+
+            echo "==> Migratsiyalar"
+            npm run migration:run
+
+            echo "==> PM2 reload (uzilishsiz)"
+            pm2 reload teldaftar --update-env || pm2 start ecosystem.config.js
+
+            echo "==> Tayyor ✅"
