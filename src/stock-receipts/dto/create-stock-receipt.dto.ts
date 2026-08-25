@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsEnum,
   IsInt,
   IsNumber,
   IsOptional,
@@ -14,6 +15,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
+import { AccessoryKind } from '../../accessories/entities/accessory.entity';
 
 /** A brand-new accessory created inline as part of a receipt line. */
 export class NewAccessoryInputDto {
@@ -22,6 +24,16 @@ export class NewAccessoryInputDto {
   @MinLength(1)
   @MaxLength(200)
   name: string;
+
+  @ApiPropertyOptional({
+    enum: AccessoryKind,
+    default: AccessoryKind.ACCESSORY,
+    description:
+      'ACCESSORY (default) or KEYPAD_PHONE — which page/tab this item belongs to',
+  })
+  @IsOptional()
+  @IsEnum(AccessoryKind)
+  kind?: AccessoryKind;
 
   @ApiPropertyOptional({ example: 25000, description: 'Default sale price' })
   @IsOptional()

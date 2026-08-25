@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  IsEnum,
   IsInt,
   IsNumber,
   IsOptional,
@@ -10,6 +11,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { AccessoryKind } from '../entities/accessory.entity';
 
 export class CreateAccessoryDto {
   @ApiProperty({ example: 'USB-C kabel 1m' })
@@ -17,6 +19,15 @@ export class CreateAccessoryDto {
   @MinLength(1)
   @MaxLength(200)
   name: string;
+
+  @ApiPropertyOptional({
+    enum: AccessoryKind,
+    default: AccessoryKind.ACCESSORY,
+    description: 'ACCESSORY (default) or KEYPAD_PHONE (button phone)',
+  })
+  @IsOptional()
+  @IsEnum(AccessoryKind)
+  kind?: AccessoryKind;
 
   @ApiProperty({ example: 15000, description: 'Cost. 0 allowed (free intake).' })
   @Type(() => Number)

@@ -69,6 +69,11 @@ export class StatisticsSummaryDto {
   @ApiProperty({ type: StatRangeDto }) range: StatRangeDto;
   @ApiProperty({ type: PhoneStatsDto }) phones: PhoneStatsDto;
   @ApiProperty({ type: AccessoryStatsDto }) accessories: AccessoryStatsDto;
+  @ApiProperty({
+    type: AccessoryStatsDto,
+    description: 'Keypad ("button") phones — same shape as accessories',
+  })
+  keypadPhones: AccessoryStatsDto;
   @ApiProperty({ type: ExpenseStatsDto }) expenses: ExpenseStatsDto;
   @ApiProperty({ type: DebtStatsDto }) debts: DebtStatsDto;
   @ApiProperty({ type: TotalsStatsDto }) totals: TotalsStatsDto;

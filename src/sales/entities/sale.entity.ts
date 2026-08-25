@@ -5,7 +5,9 @@ import { SaleItem } from './sale-item.entity';
 export enum SaleType {
   PHONE = 'PHONE',
   ACCESSORY = 'ACCESSORY',
-  /** A sale that bundles both phones and accessories in one transaction. */
+  /** A sale made up entirely of keypad ("button") phones. */
+  KEYPAD_PHONE = 'KEYPAD_PHONE',
+  /** A sale that bundles more than one category in one transaction. */
   MIXED = 'MIXED',
 }
 

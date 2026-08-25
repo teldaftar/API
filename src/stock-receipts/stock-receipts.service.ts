@@ -11,7 +11,10 @@ import {
 } from '../common';
 import { AccessoriesService } from '../accessories/accessories.service';
 import { AccessoryStockEntry } from '../accessories/entities/accessory-stock-entry.entity';
-import { Accessory } from '../accessories/entities/accessory.entity';
+import {
+  Accessory,
+  AccessoryKind,
+} from '../accessories/entities/accessory.entity';
 import {
   CreateStockReceiptDto,
   StockReceiptLineDto,
@@ -341,6 +344,7 @@ export class StockReceiptsService {
       return {
         id: l.id,
         accessoryId: l.accessoryId,
+        kind: acc?.kind ?? AccessoryKind.ACCESSORY,
         name: acc?.name ?? '',
         imageUrl: acc?.imageUrl ?? null,
         quantity: l.quantity,
@@ -361,6 +365,7 @@ export class StockReceiptsService {
   ): Promise<Accessory> {
     return manager.getRepository(Accessory).save({
       shopId,
+      kind: line.newAccessory!.kind ?? AccessoryKind.ACCESSORY,
       name: line.newAccessory!.name.trim(),
       purchasePrice: line.purchasePrice,
       // Line-level salePrice wins; fall back to the nested one.

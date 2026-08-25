@@ -18,7 +18,12 @@ import {
 } from './dto/sold-accessory.dto';
 import { AddStockDto, UpdateAccessoryDto } from './dto/update-accessory.dto';
 import { AccessoryStockEntry } from './entities/accessory-stock-entry.entity';
-import { Accessory } from './entities/accessory.entity';
+import { Accessory, AccessoryKind } from './entities/accessory.entity';
+
+/** The sale-line item_type that corresponds to an accessory of a given kind. */
+function itemTypeForKind(kind: AccessoryKind): 'ACCESSORY' | 'KEYPAD_PHONE' {
+  return kind === AccessoryKind.KEYPAD_PHONE ? 'KEYPAD_PHONE' : 'ACCESSORY';
+}
 
 /** Coerce a pg numeric/bigint (string) to number. */
 function num(value: unknown): number {
@@ -46,6 +51,7 @@ export class AccessoriesService {
     return this.dataSource.transaction(async (manager) => {
       const accessory = await manager.getRepository(Accessory).save({
         shopId,
+        kind: dto.kind ?? AccessoryKind.ACCESSORY,
         name: dto.name.trim(),
         purchasePrice: dto.purchasePrice,
         salePrice: dto.salePrice ?? null,
@@ -74,7 +80,11 @@ export class AccessoriesService {
     const qb = this.accessories
       .createQueryBuilder('a')
       .where('a.shop_id = :shopId', { shopId })
-      .andWhere('a.deleted_at IS NULL');
+      .andWhere('a.deleted_at IS NULL')
+      // Default to plain accessories; keypad phones are their own page.
+      .andWhere('a.kind = :kind', {
+        kind: query.kind ?? AccessoryKind.ACCESSORY,
+      });
 
     if (query.search) {
       qb.andWhere('a.name ILIKE :search', { search: `%${query.search}%` });
@@ -346,6 +356,7 @@ export class AccessoriesService {
     query: QuerySoldAccessoriesDto,
   ): Promise<PaginatedResult<SoldAccessoryRowDto>> {
     const pattern = `%${query.search ?? ''}%`;
+    const itemType = itemTypeForKind(query.kind ?? AccessoryKind.ACCESSORY);
 
     const [{ total }] = await this.dataSource.query(
       `
@@ -353,13 +364,13 @@ export class AccessoriesService {
         SELECT si.accessory_id
         FROM sale_items si
         JOIN accessories a ON a.id = si.accessory_id
-        WHERE si.shop_id = $1 AND si.item_type = 'ACCESSORY'
+        WHERE si.shop_id = $1 AND si.item_type = $3
           AND a.name ILIKE $2
         GROUP BY si.accessory_id
         HAVING SUM(si.quantity - si.returned_quantity) > 0
       ) x
       `,
-      [shopId, pattern],
+      [shopId, pattern, itemType],
     );
 
     const rows = await this.dataSource.query(
@@ -374,7 +385,7 @@ export class AccessoriesService {
                SUM(si.unit_price * (si.quantity - si.returned_quantity)) AS sold_amount,
                SUM(si.cost_price * (si.quantity - si.returned_quantity)) AS sold_cost_amount
         FROM sale_items si
-        WHERE si.shop_id = $1 AND si.item_type = 'ACCESSORY'
+        WHERE si.shop_id = $1 AND si.item_type = $5
         GROUP BY si.accessory_id
         HAVING SUM(si.quantity - si.returned_quantity) > 0
       ) agg
@@ -383,7 +394,7 @@ export class AccessoriesService {
       ORDER BY agg.sold_qty DESC, a.name ASC
       LIMIT $3 OFFSET $4
       `,
-      [shopId, pattern, query.limit, query.skip],
+      [shopId, pattern, query.limit, query.skip, itemType],
     );
 
     const data: SoldAccessoryRowDto[] = rows.map(
@@ -418,6 +429,7 @@ export class AccessoriesService {
     id: string,
   ): Promise<SoldAccessoryDetailDto> {
     const accessory = await this.findOne(shopId, id);
+    const itemType = itemTypeForKind(accessory.kind);
 
     const lineRows = await this.dataSource.query(
       `
@@ -426,12 +438,12 @@ export class AccessoriesService {
              SUM(si.unit_price * (si.quantity - si.returned_quantity)) AS amount,
              SUM(si.cost_price * (si.quantity - si.returned_quantity)) AS cost_amount
       FROM sale_items si
-      WHERE si.shop_id = $1 AND si.accessory_id = $2 AND si.item_type = 'ACCESSORY'
+      WHERE si.shop_id = $1 AND si.accessory_id = $2 AND si.item_type = $3
       GROUP BY si.unit_price, si.cost_price
       HAVING SUM(si.quantity - si.returned_quantity) > 0
       ORDER BY si.unit_price DESC
       `,
-      [shopId, id],
+      [shopId, id, itemType],
     );
 
     const lines: SoldAccessoryPriceLineDto[] = lineRows.map(

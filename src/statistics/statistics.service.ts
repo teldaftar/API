@@ -8,7 +8,11 @@ import {
   todayLocalDateString,
 } from '../common';
 import { QueryStatisticsDto } from './dto/query-statistics.dto';
-import { DailyStatRowDto, StatisticsSummaryDto } from './dto/statistics.dto';
+import {
+  AccessoryStatsDto,
+  DailyStatRowDto,
+  StatisticsSummaryDto,
+} from './dto/statistics.dto';
 
 /** Coerce a pg numeric/bigint (returned as string) to number. */
 function num(value: unknown): number {
@@ -108,57 +112,17 @@ export class StatisticsService {
       [shopId],
     );
 
-    const [acc] = await this.dataSource.query(
-      `
-      SELECT
-        COALESCE(SUM(unit_price * net), 0) AS sold_amount,
-        COALESCE(SUM(cost_price * net), 0) AS sold_cost_amount,
-        COALESCE(SUM(net), 0)              AS sold_qty
-      FROM (
-        SELECT si.unit_price, si.cost_price,
-               (si.quantity - si.returned_quantity) AS net
-        FROM sale_items si
-        JOIN sales s ON s.id = si.sale_id
-        WHERE si.shop_id = $1
-          AND si.item_type = 'ACCESSORY'
-          AND s.sold_at >= $2 AND s.sold_at < $3
-      ) t
-      `,
-      [shopId, range.fromUtc, range.toExclusiveUtc],
+    // Accessories and keypad phones share the batch engine but report
+    // separately — split by sale-line item_type and accessory kind.
+    const accessoryStats = await this.accessoryKindStats(
+      shopId,
+      range,
+      'ACCESSORY',
     );
-
-    const [accIntake] = await this.dataSource.query(
-      `
-      SELECT COALESCE(SUM(quantity), 0) AS purchased_qty,
-             COALESCE(SUM(quantity * purchase_price), 0) AS purchased_amount
-      FROM accessory_stock_entries
-      WHERE shop_id = $1 AND created_at >= $2 AND created_at < $3
-        AND sale_return_id IS NULL
-      `,
-      [shopId, range.fromUtc, range.toExclusiveUtc],
-    );
-
-    const [accReturns] = await this.dataSource.query(
-      `
-      SELECT COALESCE(SUM(sr.quantity), 0) AS returned_qty,
-             COALESCE(SUM(sr.amount), 0)   AS returned_amount
-      FROM sale_returns sr
-      JOIN sale_items si ON si.id = sr.sale_item_id
-      WHERE sr.shop_id = $1 AND si.item_type = 'ACCESSORY'
-        AND sr.created_at >= $2 AND sr.created_at < $3
-      `,
-      [shopId, range.fromUtc, range.toExclusiveUtc],
-    );
-
-    // Remaining stock valued FIFO — sum each layer's on-hand units at its cost.
-    const [accStock] = await this.dataSource.query(
-      `
-      SELECT COALESCE(SUM(remaining_quantity), 0) AS remaining_qty,
-             COALESCE(SUM(remaining_quantity * purchase_price), 0) AS remaining_cost_amount
-      FROM accessory_stock_entries
-      WHERE shop_id = $1
-      `,
-      [shopId],
+    const keypadStats = await this.accessoryKindStats(
+      shopId,
+      range,
+      'KEYPAD_PHONE',
     );
 
     const [expenses] = await this.dataSource.query(
@@ -241,34 +205,17 @@ export class StatisticsService {
       [shopId, range.fromUtc, range.toExclusiveUtc],
     );
 
-    const [accRetained] = await this.dataSource.query(
-      `
-      SELECT COALESCE(SUM(si.unit_price * si.returned_quantity), 0)
-             - COALESCE(SUM(rr.refunded), 0) AS retained
-      FROM sale_items si
-      JOIN sales s ON s.id = si.sale_id
-      LEFT JOIN (
-        SELECT sale_item_id, SUM(amount) AS refunded
-        FROM sale_returns WHERE shop_id = $1 GROUP BY sale_item_id
-      ) rr ON rr.sale_item_id = si.id
-      WHERE si.shop_id = $1 AND si.item_type = 'ACCESSORY'
-        AND s.sold_at >= $2 AND s.sold_at < $3
-      `,
-      [shopId, range.fromUtc, range.toExclusiveUtc],
-    );
-
     const phoneProfit =
       num(phones.sold_amount) -
       num(phones.sold_cost_amount) +
       num(phonesRetained.retained);
-    const accProfit =
-      num(acc.sold_amount) -
-      num(acc.sold_cost_amount) +
-      num(accRetained.retained);
-    const grossProfit = phoneProfit + accProfit;
+    const grossProfit =
+      phoneProfit + accessoryStats.profit + keypadStats.profit;
     const expensesTotal = num(expenses.total);
     const purchasesTotal =
-      num(phonesIntake.purchased_amount) + num(accIntake.purchased_amount);
+      num(phonesIntake.purchased_amount) +
+      accessoryStats.purchasedAmount +
+      keypadStats.purchasedAmount;
 
     return {
       range: { from: range.from, to: range.to },
@@ -286,18 +233,8 @@ export class StatisticsService {
         inStockCount: num(phonesStock.in_stock_count),
         inStockCostAmount: num(phonesStock.in_stock_cost_amount),
       },
-      accessories: {
-        purchasedQty: num(accIntake.purchased_qty),
-        purchasedAmount: num(accIntake.purchased_amount),
-        soldQty: num(acc.sold_qty),
-        soldAmount: num(acc.sold_amount),
-        soldCostAmount: num(acc.sold_cost_amount),
-        profit: this.round2(accProfit),
-        returnedQty: num(accReturns.returned_qty),
-        returnedAmount: num(accReturns.returned_amount),
-        remainingQty: num(accStock.remaining_qty),
-        remainingCostAmount: num(accStock.remaining_cost_amount),
-      },
+      accessories: accessoryStats.stats,
+      keypadPhones: keypadStats.stats,
       expenses: {
         count: num(expenses.cnt),
         total: expensesTotal,
@@ -320,6 +257,117 @@ export class StatisticsService {
         cashOut: this.round2(
           expensesTotal + purchasesTotal + num(refundsPaid.refunded),
         ),
+      },
+    };
+  }
+
+  /**
+   * Accessory-shaped stats (purchased / sold / returned / remaining + profit)
+   * for one accessory kind. `kind` is used both as the accessory discriminator
+   * (for intake/remaining, via a join to accessories) and as the sale-line
+   * item_type (for sold/returned/retained) — the two line up 1:1. Shared by the
+   * accessories and keypad-phones sections of the summary.
+   */
+  private async accessoryKindStats(
+    shopId: string,
+    range: ResolvedRange,
+    kind: 'ACCESSORY' | 'KEYPAD_PHONE',
+  ): Promise<{
+    stats: AccessoryStatsDto;
+    profit: number;
+    purchasedAmount: number;
+  }> {
+    const [sold] = await this.dataSource.query(
+      `
+      SELECT
+        COALESCE(SUM(unit_price * net), 0) AS sold_amount,
+        COALESCE(SUM(cost_price * net), 0) AS sold_cost_amount,
+        COALESCE(SUM(net), 0)              AS sold_qty
+      FROM (
+        SELECT si.unit_price, si.cost_price,
+               (si.quantity - si.returned_quantity) AS net
+        FROM sale_items si
+        JOIN sales s ON s.id = si.sale_id
+        WHERE si.shop_id = $1
+          AND si.item_type = $4
+          AND s.sold_at >= $2 AND s.sold_at < $3
+      ) t
+      `,
+      [shopId, range.fromUtc, range.toExclusiveUtc, kind],
+    );
+
+    // Intake layers for this kind (excludes returned-goods layers).
+    const [intake] = await this.dataSource.query(
+      `
+      SELECT COALESCE(SUM(ase.quantity), 0) AS purchased_qty,
+             COALESCE(SUM(ase.quantity * ase.purchase_price), 0) AS purchased_amount
+      FROM accessory_stock_entries ase
+      JOIN accessories a ON a.id = ase.accessory_id
+      WHERE ase.shop_id = $1 AND ase.created_at >= $2 AND ase.created_at < $3
+        AND ase.sale_return_id IS NULL AND a.kind = $4
+      `,
+      [shopId, range.fromUtc, range.toExclusiveUtc, kind],
+    );
+
+    const [returns] = await this.dataSource.query(
+      `
+      SELECT COALESCE(SUM(sr.quantity), 0) AS returned_qty,
+             COALESCE(SUM(sr.amount), 0)   AS returned_amount
+      FROM sale_returns sr
+      JOIN sale_items si ON si.id = sr.sale_item_id
+      WHERE sr.shop_id = $1 AND si.item_type = $4
+        AND sr.created_at >= $2 AND sr.created_at < $3
+      `,
+      [shopId, range.fromUtc, range.toExclusiveUtc, kind],
+    );
+
+    // Remaining stock valued FIFO — sum each layer's on-hand units at its cost.
+    const [stock] = await this.dataSource.query(
+      `
+      SELECT COALESCE(SUM(ase.remaining_quantity), 0) AS remaining_qty,
+             COALESCE(SUM(ase.remaining_quantity * ase.purchase_price), 0) AS remaining_cost_amount
+      FROM accessory_stock_entries ase
+      JOIN accessories a ON a.id = ase.accessory_id
+      WHERE ase.shop_id = $1 AND a.kind = $2
+      `,
+      [shopId, kind],
+    );
+
+    const [retained] = await this.dataSource.query(
+      `
+      SELECT COALESCE(SUM(si.unit_price * si.returned_quantity), 0)
+             - COALESCE(SUM(rr.refunded), 0) AS retained
+      FROM sale_items si
+      JOIN sales s ON s.id = si.sale_id
+      LEFT JOIN (
+        SELECT sale_item_id, SUM(amount) AS refunded
+        FROM sale_returns WHERE shop_id = $1 GROUP BY sale_item_id
+      ) rr ON rr.sale_item_id = si.id
+      WHERE si.shop_id = $1 AND si.item_type = $4
+        AND s.sold_at >= $2 AND s.sold_at < $3
+      `,
+      [shopId, range.fromUtc, range.toExclusiveUtc, kind],
+    );
+
+    const profit =
+      num(sold.sold_amount) -
+      num(sold.sold_cost_amount) +
+      num(retained.retained);
+
+    return {
+      profit,
+      purchasedAmount: num(intake.purchased_amount),
+      stats: {
+        purchasedQty: num(intake.purchased_qty),
+        purchasedAmount: num(intake.purchased_amount),
+        soldQty: num(sold.sold_qty),
+        soldAmount: num(sold.sold_amount),
+        soldCostAmount: num(sold.sold_cost_amount),
+        profit: this.round2(profit),
+        returnedQty: num(returns.returned_qty),
+        returnedAmount: num(returns.returned_amount),
+        remainingQty: num(stock.remaining_qty),
+        remainingCostAmount: num(stock.remaining_cost_amount),
       },
     };
   }

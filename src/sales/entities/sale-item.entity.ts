@@ -5,11 +5,18 @@ import { Sale } from './sale.entity';
 export enum SaleItemType {
   PHONE = 'PHONE',
   ACCESSORY = 'ACCESSORY',
+  /**
+   * Keypad ("button") phone — mechanically an accessory line (uses accessory_id
+   * + a chosen stock batch), tagged separately so sales/stats can report it on
+   * its own. See {@link AccessoryKind}.
+   */
+  KEYPAD_PHONE = 'KEYPAD_PHONE',
 }
 
 /**
- * DB CHECK (added in migration): exactly one of phone_id / accessory_id is set,
- * matching item_type.
+ * DB CHECK (added in migration): a PHONE line carries phone_id; any non-PHONE
+ * line (ACCESSORY or KEYPAD_PHONE) carries accessory_id — exactly one of the
+ * two id columns is ever set.
  */
 @Entity('sale_items')
 @Index('idx_sale_items_sale_id', ['saleId'])

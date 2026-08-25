@@ -1,9 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Accessory } from '../entities/accessory.entity';
+import { Accessory, AccessoryKind } from '../entities/accessory.entity';
 import { AccessoryStockEntry } from '../entities/accessory-stock-entry.entity';
 
 export class AccessoryResponseDto {
   @ApiProperty() id: string;
+  @ApiProperty({ enum: AccessoryKind }) kind: AccessoryKind;
   @ApiProperty() name: string;
   @ApiProperty() purchasePrice: number;
   @ApiPropertyOptional({ nullable: true }) salePrice: number | null;
@@ -16,6 +17,7 @@ export class AccessoryResponseDto {
   static from(a: Accessory): AccessoryResponseDto {
     return {
       id: a.id,
+      kind: a.kind,
       name: a.name,
       purchasePrice: a.purchasePrice,
       salePrice: a.salePrice,

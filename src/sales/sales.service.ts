@@ -12,7 +12,10 @@ import {
   todayLocalDateString,
 } from '../common';
 import { AccessoriesService } from '../accessories/accessories.service';
-import { Accessory } from '../accessories/entities/accessory.entity';
+import {
+  Accessory,
+  AccessoryKind,
+} from '../accessories/entities/accessory.entity';
 import { Debt, DebtStatus } from '../debts/entities/debt.entity';
 import { Phone, PhoneStatus } from '../phones/entities/phone.entity';
 import { DebtPayment } from '../debts/entities/debt-payment.entity';
@@ -60,8 +63,8 @@ export class SalesService {
     const saleId = await this.dataSource.transaction(async (manager) => {
       const phoneIdsSeen = new Set<string>();
       const stockEntryIdsSeen = new Set<string>();
-      let hasPhone = false;
-      let hasAccessory = false;
+      // Distinct product categories in this sale, to derive the header type.
+      const categories = new Set<SaleType>();
       let totalAmount = 0;
 
       // Build every line first (locking + consuming stock), then the header.
@@ -69,7 +72,7 @@ export class SalesService {
 
       for (const line of dto.items) {
         if (line.type === SaleItemType.PHONE) {
-          hasPhone = true;
+          categories.add(SaleType.PHONE);
           const built = await this.buildPhoneLine(
             manager,
             shopId,
@@ -79,7 +82,12 @@ export class SalesService {
           pendingItems.push(built.item);
           totalAmount += built.lineTotal;
         } else {
-          hasAccessory = true;
+          // ACCESSORY and KEYPAD_PHONE both draw from the accessory batch engine.
+          categories.add(
+            line.type === SaleItemType.KEYPAD_PHONE
+              ? SaleType.KEYPAD_PHONE
+              : SaleType.ACCESSORY,
+          );
           const built = await this.buildAccessoryLine(
             manager,
             shopId,
@@ -92,12 +100,11 @@ export class SalesService {
       }
 
       totalAmount = this.round2(totalAmount);
+      // One category → that type; more than one → MIXED.
       const type =
-        hasPhone && hasAccessory
+        categories.size > 1
           ? SaleType.MIXED
-          : hasPhone
-            ? SaleType.PHONE
-            : SaleType.ACCESSORY;
+          : (categories.values().next().value as SaleType);
 
       const debt = dto.debt ? this.validateDebt(dto.debt, totalAmount) : null;
       const paidAmount = debt ? totalAmount - debt.amount : totalAmount;
@@ -226,6 +233,19 @@ export class SalesService {
       line.accessoryId,
     );
 
+    // The line type must match what the item actually is — you can't sell a
+    // keypad phone on an ACCESSORY line or vice versa.
+    const expectedType =
+      accessory.kind === AccessoryKind.KEYPAD_PHONE
+        ? SaleItemType.KEYPAD_PHONE
+        : SaleItemType.ACCESSORY;
+    if (line.type !== expectedType) {
+      throw BusinessException.badRequest(
+        ErrorCode.SALE_LINE_INVALID,
+        `Line type ${line.type} does not match item kind ${accessory.kind}`,
+      );
+    }
+
     const { cost } = await this.accessories.consumeLayer(
       manager,
       accessory,
@@ -238,7 +258,7 @@ export class SalesService {
     return {
       lineTotal,
       item: {
-        itemType: SaleItemType.ACCESSORY,
+        itemType: expectedType,
         phoneId: null,
         accessoryId: accessory.id,
         quantity: line.quantity,
@@ -470,9 +490,9 @@ export class SalesService {
             { id: item.phoneId, shopId },
             { status: PhoneStatus.IN_STOCK },
           );
-      } else if (item.itemType === SaleItemType.ACCESSORY && item.accessoryId) {
-        // Returned units re-enter as their own FIFO layer, valued at the cost
-        // they were sold at (the sale item's blended snapshot).
+      } else if (item.accessoryId) {
+        // ACCESSORY or KEYPAD_PHONE — returned units re-enter as their own FIFO
+        // layer, valued at the cost they were sold at (the sale item snapshot).
         const accessory = await this.accessories.lockAccessory(
           manager,
           shopId,

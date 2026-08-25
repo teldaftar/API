@@ -635,6 +635,19 @@
             }
           },
           {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "description": "Filter by kind. Omitted → ACCESSORY only (keypad phones are a separate page).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACCESSORY",
+                "KEYPAD_PHONE"
+              ]
+            }
+          },
+          {
             "name": "inStock",
             "required": false,
             "in": "query",
@@ -735,6 +748,19 @@
             "description": "Match on accessory name",
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "kind",
+            "required": false,
+            "in": "query",
+            "description": "Filter by kind. Omitted → ACCESSORY only (keypad phones are a separate page).",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ACCESSORY",
+                "KEYPAD_PHONE"
+              ]
             }
           }
         ],
@@ -1271,6 +1297,7 @@
               "enum": [
                 "PHONE",
                 "ACCESSORY",
+                "KEYPAD_PHONE",
                 "MIXED"
               ]
             }
@@ -2767,6 +2794,15 @@
             "type": "string",
             "example": "USB-C kabel 1m"
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ACCESSORY",
+              "KEYPAD_PHONE"
+            ],
+            "default": "ACCESSORY",
+            "description": "ACCESSORY (default) or KEYPAD_PHONE (button phone)"
+          },
           "purchasePrice": {
             "type": "number",
             "example": 15000,
@@ -2800,6 +2836,13 @@
           "id": {
             "type": "string"
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ACCESSORY",
+              "KEYPAD_PHONE"
+            ]
+          },
           "name": {
             "type": "string"
           },
@@ -2832,6 +2875,7 @@
         },
         "required": [
           "id",
+          "kind",
           "name",
           "purchasePrice",
           "quantity",
@@ -2937,6 +2981,15 @@
             "type": "string",
             "example": "USB-C kabel 1m"
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ACCESSORY",
+              "KEYPAD_PHONE"
+            ],
+            "default": "ACCESSORY",
+            "description": "ACCESSORY (default) or KEYPAD_PHONE (button phone)"
+          },
           "purchasePrice": {
             "type": "number",
             "example": 15000,
@@ -3018,6 +3071,13 @@
           "accessoryId": {
             "type": "string"
           },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ACCESSORY",
+              "KEYPAD_PHONE"
+            ]
+          },
           "name": {
             "type": "string"
           },
@@ -3047,6 +3107,7 @@
         "required": [
           "id",
           "accessoryId",
+          "kind",
           "name",
           "quantity",
           "remaining",
@@ -3111,6 +3172,15 @@
           "name": {
             "type": "string",
             "example": "Type-C kabel 1m"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "ACCESSORY",
+              "KEYPAD_PHONE"
+            ],
+            "default": "ACCESSORY",
+            "description": "ACCESSORY (default) or KEYPAD_PHONE — which page/tab this item belongs to"
           },
           "salePrice": {
             "type": "number",
@@ -3253,7 +3323,8 @@
             "type": "string",
             "enum": [
               "PHONE",
-              "ACCESSORY"
+              "ACCESSORY",
+              "KEYPAD_PHONE"
             ]
           },
           "quantity": {
@@ -3300,6 +3371,7 @@
             "enum": [
               "PHONE",
               "ACCESSORY",
+              "KEYPAD_PHONE",
               "MIXED"
             ]
           },
@@ -3378,7 +3450,8 @@
             "type": "string",
             "enum": [
               "PHONE",
-              "ACCESSORY"
+              "ACCESSORY",
+              "KEYPAD_PHONE"
             ]
           },
           "phoneId": {
@@ -4004,6 +4077,14 @@
           "accessories": {
             "$ref": "#/components/schemas/AccessoryStatsDto"
           },
+          "keypadPhones": {
+            "description": "Keypad (\"button\") phones — same shape as accessories",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AccessoryStatsDto"
+              }
+            ]
+          },
           "expenses": {
             "$ref": "#/components/schemas/ExpenseStatsDto"
           },
@@ -4018,6 +4099,7 @@
           "range",
           "phones",
           "accessories",
+          "keypadPhones",
           "expenses",
           "debts",
           "totals"

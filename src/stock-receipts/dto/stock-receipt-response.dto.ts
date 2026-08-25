@@ -1,9 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { AccessoryKind } from '../../accessories/entities/accessory.entity';
 import { StockReceipt } from '../entities/stock-receipt.entity';
 
 export class StockReceiptItemResponseDto {
   @ApiProperty() id: string;
   @ApiProperty() accessoryId: string;
+  @ApiProperty({ enum: AccessoryKind }) kind: AccessoryKind;
   @ApiProperty() name: string;
   @ApiPropertyOptional({ nullable: true }) imageUrl: string | null;
   @ApiProperty() quantity: number;
