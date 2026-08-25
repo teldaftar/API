@@ -42,6 +42,15 @@ export class NewAccessoryInputDto {
   @IsPositive()
   salePrice?: number;
 
+  @ApiPropertyOptional({
+    example: '356938035643809',
+    description: 'IMEI — only for keypad phones (kind=KEYPAD_PHONE)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  imei?: string;
+
   @ApiPropertyOptional({ example: '/uploads/abc.webp' })
   @IsOptional()
   @IsString()

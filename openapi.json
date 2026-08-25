@@ -2817,6 +2817,11 @@
             "type": "number",
             "example": 25000
           },
+          "imei": {
+            "type": "string",
+            "example": "356938035643809",
+            "description": "IMEI — only for keypad phones (KEYPAD_PHONE)"
+          },
           "imageUrl": {
             "type": "string"
           },
@@ -2845,6 +2850,10 @@
           },
           "name": {
             "type": "string"
+          },
+          "imei": {
+            "type": "object",
+            "nullable": true
           },
           "purchasePrice": {
             "type": "number"
@@ -2999,6 +3008,11 @@
             "type": "number",
             "example": 25000
           },
+          "imei": {
+            "type": "string",
+            "example": "356938035643809",
+            "description": "IMEI — only for keypad phones (KEYPAD_PHONE)"
+          },
           "imageUrl": {
             "type": "string"
           },
@@ -3080,6 +3094,10 @@
           },
           "name": {
             "type": "string"
+          },
+          "imei": {
+            "type": "object",
+            "nullable": true
           },
           "imageUrl": {
             "type": "object",
@@ -3186,6 +3204,11 @@
             "type": "number",
             "example": 25000,
             "description": "Default sale price"
+          },
+          "imei": {
+            "type": "string",
+            "example": "356938035643809",
+            "description": "IMEI — only for keypad phones (kind=KEYPAD_PHONE)"
           },
           "imageUrl": {
             "type": "string",

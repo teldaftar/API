@@ -6,6 +6,7 @@ export class AccessoryResponseDto {
   @ApiProperty() id: string;
   @ApiProperty({ enum: AccessoryKind }) kind: AccessoryKind;
   @ApiProperty() name: string;
+  @ApiPropertyOptional({ nullable: true }) imei: string | null;
   @ApiProperty() purchasePrice: number;
   @ApiPropertyOptional({ nullable: true }) salePrice: number | null;
   @ApiProperty() quantity: number;
@@ -19,6 +20,7 @@ export class AccessoryResponseDto {
       id: a.id,
       kind: a.kind,
       name: a.name,
+      imei: a.imei,
       purchasePrice: a.purchasePrice,
       salePrice: a.salePrice,
       quantity: a.quantity,

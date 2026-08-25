@@ -29,6 +29,14 @@ export class Accessory extends SoftDeletableEntity {
   @Column({ type: 'varchar' })
   name: string;
 
+  /**
+   * Optional IMEI. Only meaningful for KEYPAD_PHONE items (a single physical
+   * phone); plain accessories leave it null. Not enforced unique — a keypad
+   * "accessory" row can carry a quantity, and duplicate/blank IMEIs happen.
+   */
+  @Column({ type: 'varchar', nullable: true })
+  imei: string | null;
+
   /** Latest intake cost. */
   @Column({
     name: 'purchase_price',

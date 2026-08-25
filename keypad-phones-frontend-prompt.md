@@ -31,6 +31,7 @@ GET /api/accessories?kind=KEYPAD_PHONE&search=<matn>&inStock=<true|false>&page=1
     "id": "uuid",
     "kind": "KEYPAD_PHONE",
     "name": "Nokia 105",
+    "imei": "356938035643809",   // null bo'lishi mumkin (faqat klaviaturali telefonlarda)
     "purchasePrice": 100000,     // eng eski qolgan partiya tannarxi (ko'rsatish uchun)
     "salePrice": 150000,          // null bo'lishi mumkin
     "quantity": 3,                // qoldiq (Σ partiyalar)
@@ -43,7 +44,7 @@ GET /api/accessories?kind=KEYPAD_PHONE&search=<matn>&inStock=<true|false>&page=1
 ### Bitta element / o'zgartirish / o'chirish
 ```
 GET    /api/accessories/:id
-PATCH  /api/accessories/:id      body: { name?, salePrice?, imageUrl?, note? }
+PATCH  /api/accessories/:id      body: { name?, imei?, salePrice?, imageUrl?, note? }
 DELETE /api/accessories/:id
 ```
 - **PATCH'da `purchasePrice` YUBORMANG** va `kind` o'zgartirib bo'lmaydi
@@ -91,6 +92,7 @@ POST /api/stock-receipts
       "newAccessory": {
         "name": "Nokia 105",
         "kind": "KEYPAD_PHONE",   // ← klaviaturali tabda shu; aksessuar tabda "ACCESSORY" yoki tashlab keting
+        "imei": "356938035643809", // optional — faqat klaviaturali telefon uchun
         "salePrice": 150000,      // optional
         "imageUrl": "/uploads/...", // optional
         "note": "..."             // optional
@@ -107,18 +109,18 @@ POST /api/stock-receipts
 - Yangi **klaviaturali telefon** yaratish uchun: `newAccessory.kind =
   "KEYPAD_PHONE"`. Yangi aksessuar uchun `"ACCESSORY"` (yoki tashlab keting —
   default ACCESSORY).
-- Maydonlar (foydalanuvchi so'ragan): **Nom/model** (`name`), **sotib olingan
-  narx** (`purchasePrice`), **sotish narxi** (`salePrice`, optional), **izoh**
-  (`note`, optional), **rasm** (`imageUrl`, optional), **miqdor** (`quantity`,
-  default 1).
+- Maydonlar (foydalanuvchi so'ragan): **Nom/model** (`name`), **IMEI** (`imei`,
+  optional — faqat klaviaturali tabda ko'rsating), **sotib olingan narx**
+  (`purchasePrice`), **sotish narxi** (`salePrice`, optional), **izoh** (`note`,
+  optional), **rasm** (`imageUrl`, optional), **miqdor** (`quantity`, default 1).
 
 ### Kirim tafsiloti / ro'yxati
 ```
 GET /api/stock-receipts/:id
 ```
-- Endi javob liniyalarida **`kind`** bor — kirim tafsilotida qaysi liniya
-  klaviaturali telefon, qaysi biri aksessuar ekanini ajratib ko'rsatish mumkin
-  (masalan tab/belgi bilan).
+- Endi javob liniyalarida **`kind`** va **`imei`** bor — kirim tafsilotida qaysi
+  liniya klaviaturali telefon, qaysi biri aksessuar ekanini ajratib ko'rsatish
+  mumkin (masalan tab/belgi bilan), IMEI ni ham ko'rsatish mumkin.
 
 ---
 

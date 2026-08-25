@@ -53,6 +53,7 @@ export class AccessoriesService {
         shopId,
         kind: dto.kind ?? AccessoryKind.ACCESSORY,
         name: dto.name.trim(),
+        imei: dto.imei?.trim() || null,
         purchasePrice: dto.purchasePrice,
         salePrice: dto.salePrice ?? null,
         quantity: 0,
@@ -120,6 +121,7 @@ export class AccessoriesService {
     const previousImage = accessory.imageUrl;
 
     if (dto.name !== undefined) accessory.name = dto.name.trim();
+    if (dto.imei !== undefined) accessory.imei = dto.imei?.trim() || null;
     if (dto.purchasePrice !== undefined)
       accessory.purchasePrice = dto.purchasePrice;
     if (dto.salePrice !== undefined) accessory.salePrice = dto.salePrice;

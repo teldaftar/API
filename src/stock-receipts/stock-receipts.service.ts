@@ -346,6 +346,7 @@ export class StockReceiptsService {
         accessoryId: l.accessoryId,
         kind: acc?.kind ?? AccessoryKind.ACCESSORY,
         name: acc?.name ?? '',
+        imei: acc?.imei ?? null,
         imageUrl: acc?.imageUrl ?? null,
         quantity: l.quantity,
         remaining: l.remainingQuantity,
@@ -367,6 +368,7 @@ export class StockReceiptsService {
       shopId,
       kind: line.newAccessory!.kind ?? AccessoryKind.ACCESSORY,
       name: line.newAccessory!.name.trim(),
+      imei: line.newAccessory!.imei?.trim() || null,
       purchasePrice: line.purchasePrice,
       // Line-level salePrice wins; fall back to the nested one.
       salePrice: line.salePrice ?? line.newAccessory!.salePrice ?? null,

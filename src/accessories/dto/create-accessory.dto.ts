@@ -48,6 +48,15 @@ export class CreateAccessoryDto {
   @IsPositive()
   salePrice?: number;
 
+  @ApiPropertyOptional({
+    example: '356938035643809',
+    description: 'IMEI — only for keypad phones (KEYPAD_PHONE)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  imei?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

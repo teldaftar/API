@@ -7,6 +7,7 @@ export class StockReceiptItemResponseDto {
   @ApiProperty() accessoryId: string;
   @ApiProperty({ enum: AccessoryKind }) kind: AccessoryKind;
   @ApiProperty() name: string;
+  @ApiPropertyOptional({ nullable: true }) imei: string | null;
   @ApiPropertyOptional({ nullable: true }) imageUrl: string | null;
   @ApiProperty() quantity: number;
   @ApiProperty({ description: 'Units from this intake still on hand (FIFO)' })
