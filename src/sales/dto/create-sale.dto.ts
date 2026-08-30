@@ -101,4 +101,15 @@ export class CreateSaleDto {
   @ValidateNested()
   @Type(() => DebtInputDto)
   debt?: DebtInputDto;
+
+  @ApiPropertyOptional({
+    example: '3f9a1c2e-5b7d-4e21-9c3a-8f0b1d2e4a6c',
+    description:
+      'Retry-safe checkout key. Generate ONE UUID per sale intent and reuse it ' +
+      'across retries of the same submit. A duplicate submit with the same key ' +
+      'returns the already-created sale instead of selling twice.',
+  })
+  @IsOptional()
+  @IsUUID()
+  idempotencyKey?: string;
 }

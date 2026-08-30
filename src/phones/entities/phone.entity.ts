@@ -97,4 +97,12 @@ export class Phone extends SoftDeletableEntity {
     default: PhoneStatus.IN_STOCK,
   })
   status: PhoneStatus;
+
+  /**
+   * Client-supplied key for retry-safe intake. Unique per shop (partial index
+   * `uq_phones_shop_idempotency`) so a duplicate submit collapses to one row.
+   * Null for legacy/import paths that don't send one.
+   */
+  @Column({ name: 'idempotency_key', type: 'uuid', nullable: true })
+  idempotencyKey: string | null;
 }

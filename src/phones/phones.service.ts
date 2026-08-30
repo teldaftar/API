@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, DataSource, In, Repository } from 'typeorm';
+import {
+  Brackets,
+  DataSource,
+  In,
+  QueryFailedError,
+  Repository,
+} from 'typeorm';
 import {
   BusinessException,
   ErrorCode,
@@ -166,6 +172,21 @@ export class PhonesService {
   }
 
   async create(shopId: string, dto: CreatePhoneDto): Promise<Phone> {
+    // Retry-safe intake. The reported bug: on a flaky network the frontend's
+    // request was retried (or double-submitted) while the response was lost,
+    // and each attempt inserted a fresh row — so one phone entered stock twice.
+    // A client-supplied `idempotencyKey` (one per "add phone" intent) fixes
+    // this: a repeat submit with the same key returns the first phone instead
+    // of creating a second. The fast path catches a sequential retry; the
+    // partial unique index + the catch below cover a truly concurrent race.
+    if (dto.idempotencyKey) {
+      const existing = await this.findByIdempotencyKey(
+        shopId,
+        dto.idempotencyKey,
+      );
+      if (existing) return existing;
+    }
+
     if (dto.imei) {
       await this.assertImeiFree(shopId, dto.imei);
     }
@@ -191,8 +212,42 @@ export class PhonesService {
       imageUrl: dto.imageUrl ?? null,
       note: dto.note ?? null,
       status: PhoneStatus.IN_STOCK,
+      idempotencyKey: dto.idempotencyKey ?? null,
     });
-    return this.phones.save(phone);
+
+    try {
+      return await this.phones.save(phone);
+    } catch (err) {
+      // A concurrent submit with the same key won the insert race: the unique
+      // index (uq_phones_shop_idempotency) rejects ours — return the winner.
+      if (dto.idempotencyKey && this.isUniqueViolation(err)) {
+        const existing = await this.findByIdempotencyKey(
+          shopId,
+          dto.idempotencyKey,
+        );
+        if (existing) return existing;
+        // Not a key clash — must be a concurrent IMEI collision. Surface the
+        // friendly conflict instead of leaking a raw DB error.
+        if (dto.imei) {
+          await this.assertImeiFree(shopId, dto.imei);
+        }
+      }
+      throw err;
+    }
+  }
+
+  private findByIdempotencyKey(
+    shopId: string,
+    idempotencyKey: string,
+  ): Promise<Phone | null> {
+    return this.phones.findOne({ where: { shopId, idempotencyKey } });
+  }
+
+  private isUniqueViolation(err: unknown): boolean {
+    return (
+      err instanceof QueryFailedError &&
+      (err.driverError as { code?: string })?.code === '23505'
+    );
   }
 
   async findAll(

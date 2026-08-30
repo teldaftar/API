@@ -1990,6 +1990,193 @@
         ]
       }
     },
+    "/creditors": {
+      "get": {
+        "operationId": "CreditorsController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive start date (shop-local)",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive end date (shop-local)",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Match on creditor name, phone or note",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List creditors (haqdorlar)",
+        "tags": [
+          "creditors"
+        ]
+      },
+      "post": {
+        "operationId": "CreditorsController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateCreditorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create a creditor",
+        "tags": [
+          "creditors"
+        ]
+      }
+    },
+    "/creditors/{id}": {
+      "patch": {
+        "operationId": "CreditorsController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateCreditorDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreditorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update a creditor",
+        "tags": [
+          "creditors"
+        ]
+      },
+      "delete": {
+        "operationId": "CreditorsController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Soft-delete a creditor",
+        "tags": [
+          "creditors"
+        ]
+      }
+    },
     "/statistics/summary": {
       "get": {
         "operationId": "StatisticsController_summary",
@@ -2459,6 +2646,11 @@
           },
           "note": {
             "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "example": "3f9a1c2e-5b7d-4e21-9c3a-8f0b1d2e4a6c",
+            "description": "Retry-safe intake key. Generate ONE UUID per \"add phone\" intent and reuse it across retries of the same submit. A duplicate submit with the same key returns the already-created phone instead of adding a second one."
           }
         },
         "required": [
@@ -2751,6 +2943,11 @@
           },
           "note": {
             "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "example": "3f9a1c2e-5b7d-4e21-9c3a-8f0b1d2e4a6c",
+            "description": "Retry-safe intake key. Generate ONE UUID per \"add phone\" intent and reuse it across retries of the same submit. A duplicate submit with the same key returns the already-created phone instead of adding a second one."
           }
         }
       },
@@ -3560,6 +3757,11 @@
           },
           "debt": {
             "$ref": "#/components/schemas/DebtInputDto"
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "example": "3f9a1c2e-5b7d-4e21-9c3a-8f0b1d2e4a6c",
+            "description": "Retry-safe checkout key. Generate ONE UUID per sale intent and reuse it across retries of the same submit. A duplicate submit with the same key returns the already-created sale instead of selling twice."
           }
         },
         "required": [
@@ -3885,6 +4087,120 @@
           "spentAt": {
             "type": "string",
             "description": "Defaults to today (shop-local)"
+          }
+        }
+      },
+      "CreateCreditorDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "example": 5000000,
+            "description": "Summa — amount owed"
+          },
+          "creditorName": {
+            "type": "string",
+            "example": "Akmal aka",
+            "description": "Kimdan — creditor name"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567",
+            "description": "Tel nomer — optional contact phone"
+          },
+          "note": {
+            "type": "string",
+            "description": "Izoh — optional note"
+          },
+          "borrowedAt": {
+            "type": "string",
+            "description": "Olgan sana — defaults to today (shop-local)"
+          },
+          "dueDate": {
+            "type": "string",
+            "description": "Beradigan sana — due date to return"
+          }
+        },
+        "required": [
+          "amount",
+          "creditorName",
+          "dueDate"
+        ]
+      },
+      "CreditorResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "creditorName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "note": {
+            "type": "object",
+            "nullable": true
+          },
+          "borrowedAt": {
+            "type": "string"
+          },
+          "dueDate": {
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "creditorName",
+          "borrowedAt",
+          "dueDate",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "UpdateCreditorDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number",
+            "example": 5000000,
+            "description": "Summa — amount owed"
+          },
+          "creditorName": {
+            "type": "string",
+            "example": "Akmal aka",
+            "description": "Kimdan — creditor name"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+998901234567",
+            "description": "Tel nomer — optional contact phone"
+          },
+          "note": {
+            "type": "string",
+            "description": "Izoh — optional note"
+          },
+          "borrowedAt": {
+            "type": "string",
+            "description": "Olgan sana — defaults to today (shop-local)"
+          },
+          "dueDate": {
+            "type": "string",
+            "description": "Beradigan sana — due date to return"
           }
         }
       },

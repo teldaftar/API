@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  IsUUID,
   MaxLength,
   Min,
   MinLength,
@@ -125,4 +126,15 @@ export class CreatePhoneDto {
   @IsString()
   @MaxLength(2000)
   note?: string;
+
+  @ApiPropertyOptional({
+    example: '3f9a1c2e-5b7d-4e21-9c3a-8f0b1d2e4a6c',
+    description:
+      'Retry-safe intake key. Generate ONE UUID per "add phone" intent and ' +
+      'reuse it across retries of the same submit. A duplicate submit with the ' +
+      'same key returns the already-created phone instead of adding a second one.',
+  })
+  @IsOptional()
+  @IsUUID()
+  idempotencyKey?: string;
 }

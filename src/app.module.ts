@@ -12,6 +12,7 @@ import { StockReceiptsModule } from './stock-receipts/stock-receipts.module';
 import { SalesModule } from './sales/sales.module';
 import { DebtsModule } from './debts/debts.module';
 import { ExpensesModule } from './expenses/expenses.module';
+import { CreditorsModule } from './creditors/creditors.module';
 import { StatisticsModule } from './statistics/statistics.module';
 
 @Module({
@@ -51,6 +52,7 @@ import { StatisticsModule } from './statistics/statistics.module';
     SalesModule,
     DebtsModule,
     ExpensesModule,
+    CreditorsModule,
     StatisticsModule,
   ],
 })

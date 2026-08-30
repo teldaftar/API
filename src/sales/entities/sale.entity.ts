@@ -77,6 +77,14 @@ export class Sale extends UuidEntity {
   @Column({ name: 'sold_at', type: 'timestamptz', default: () => 'now()' })
   soldAt: Date;
 
+  /**
+   * Client-supplied key for retry-safe checkout. Unique per shop (partial index
+   * `uq_sales_shop_idempotency`) so a duplicate submit collapses to one sale.
+   * Null for legacy/import paths that don't send one.
+   */
+  @Column({ name: 'idempotency_key', type: 'uuid', nullable: true })
+  idempotencyKey: string | null;
+
   @OneToMany(() => SaleItem, (item) => item.sale)
   items: SaleItem[];
 }

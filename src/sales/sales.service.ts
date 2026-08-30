@@ -1,6 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, DataSource, EntityManager, In, Repository } from 'typeorm';
+import {
+  Brackets,
+  DataSource,
+  EntityManager,
+  In,
+  QueryFailedError,
+  Repository,
+} from 'typeorm';
 import {
   BusinessException,
   ErrorCode,
@@ -60,87 +67,123 @@ export class SalesService {
     userId: string,
     dto: CreateSaleDto,
   ): Promise<SaleResponseDto> {
-    const saleId = await this.dataSource.transaction(async (manager) => {
-      const phoneIdsSeen = new Set<string>();
-      const stockEntryIdsSeen = new Set<string>();
-      // Distinct product categories in this sale, to derive the header type.
-      const categories = new Set<SaleType>();
-      let totalAmount = 0;
-
-      // Build every line first (locking + consuming stock), then the header.
-      const pendingItems: Array<Partial<SaleItem>> = [];
-
-      for (const line of dto.items) {
-        if (line.type === SaleItemType.PHONE) {
-          categories.add(SaleType.PHONE);
-          const built = await this.buildPhoneLine(
-            manager,
-            shopId,
-            line,
-            phoneIdsSeen,
-          );
-          pendingItems.push(built.item);
-          totalAmount += built.lineTotal;
-        } else {
-          // ACCESSORY and KEYPAD_PHONE both draw from the accessory batch engine.
-          categories.add(
-            line.type === SaleItemType.KEYPAD_PHONE
-              ? SaleType.KEYPAD_PHONE
-              : SaleType.ACCESSORY,
-          );
-          const built = await this.buildAccessoryLine(
-            manager,
-            shopId,
-            line,
-            stockEntryIdsSeen,
-          );
-          pendingItems.push(built.item);
-          totalAmount += built.lineTotal;
-        }
-      }
-
-      totalAmount = this.round2(totalAmount);
-      // One category → that type; more than one → MIXED.
-      const type =
-        categories.size > 1
-          ? SaleType.MIXED
-          : (categories.values().next().value as SaleType);
-
-      const debt = dto.debt ? this.validateDebt(dto.debt, totalAmount) : null;
-      const paidAmount = debt ? totalAmount - debt.amount : totalAmount;
-
-      const sale = await manager.getRepository(Sale).save({
-        shopId,
-        code: await this.nextSaleCode(manager, shopId),
-        type,
-        totalAmount,
-        paidAmount,
-        debtAmount: debt ? debt.amount : 0,
-        status: SaleStatus.COMPLETED,
-        note: dto.note ?? null,
-        customerName:
-          dto.customerName?.trim() || debt?.customerName?.trim() || null,
-        customerPhone: dto.customerPhone?.trim() || debt?.customerPhone || null,
-        soldBy: userId,
+    // Retry-safe checkout. On a flaky network the frontend's request can be
+    // retried (or the button double-clicked) while the response is lost. With
+    // a client-supplied `idempotencyKey` (one per checkout intent) a repeat
+    // submit returns the first sale instead of selling the stock again. The
+    // fast path handles a sequential retry; the partial unique index + the
+    // catch below cover a truly concurrent race.
+    if (dto.idempotencyKey) {
+      const existing = await this.sales.findOne({
+        where: { shopId, idempotencyKey: dto.idempotencyKey },
       });
+      if (existing) return this.findOne(shopId, existing.id);
+    }
 
-      await manager.getRepository(SaleItem).save(
-        pendingItems.map((item) => ({
-          ...item,
+    let saleId: string;
+    try {
+      saleId = await this.dataSource.transaction(async (manager) => {
+        const phoneIdsSeen = new Set<string>();
+        const stockEntryIdsSeen = new Set<string>();
+        // Distinct product categories in this sale, to derive the header type.
+        const categories = new Set<SaleType>();
+        let totalAmount = 0;
+
+        // Build every line first (locking + consuming stock), then the header.
+        const pendingItems: Array<Partial<SaleItem>> = [];
+
+        for (const line of dto.items) {
+          if (line.type === SaleItemType.PHONE) {
+            categories.add(SaleType.PHONE);
+            const built = await this.buildPhoneLine(
+              manager,
+              shopId,
+              line,
+              phoneIdsSeen,
+            );
+            pendingItems.push(built.item);
+            totalAmount += built.lineTotal;
+          } else {
+            // ACCESSORY and KEYPAD_PHONE both draw from the accessory batch engine.
+            categories.add(
+              line.type === SaleItemType.KEYPAD_PHONE
+                ? SaleType.KEYPAD_PHONE
+                : SaleType.ACCESSORY,
+            );
+            const built = await this.buildAccessoryLine(
+              manager,
+              shopId,
+              line,
+              stockEntryIdsSeen,
+            );
+            pendingItems.push(built.item);
+            totalAmount += built.lineTotal;
+          }
+        }
+
+        totalAmount = this.round2(totalAmount);
+        // One category → that type; more than one → MIXED.
+        const type =
+          categories.size > 1
+            ? SaleType.MIXED
+            : (categories.values().next().value as SaleType);
+
+        const debt = dto.debt ? this.validateDebt(dto.debt, totalAmount) : null;
+        const paidAmount = debt ? totalAmount - debt.amount : totalAmount;
+
+        const sale = await manager.getRepository(Sale).save({
           shopId,
-          saleId: sale.id,
-          returnedQuantity: 0,
-        })),
-      );
+          code: await this.nextSaleCode(manager, shopId),
+          type,
+          totalAmount,
+          paidAmount,
+          debtAmount: debt ? debt.amount : 0,
+          status: SaleStatus.COMPLETED,
+          note: dto.note ?? null,
+          customerName:
+            dto.customerName?.trim() || debt?.customerName?.trim() || null,
+          customerPhone:
+            dto.customerPhone?.trim() || debt?.customerPhone || null,
+          soldBy: userId,
+          idempotencyKey: dto.idempotencyKey ?? null,
+        });
 
-      if (debt) {
-        await this.createDebt(manager, shopId, sale.id, debt);
+        await manager.getRepository(SaleItem).save(
+          pendingItems.map((item) => ({
+            ...item,
+            shopId,
+            saleId: sale.id,
+            returnedQuantity: 0,
+          })),
+        );
+
+        if (debt) {
+          await this.createDebt(manager, shopId, sale.id, debt);
+        }
+
+        return sale.id;
+      });
+    } catch (err) {
+      // A concurrent submit with the same key won the insert race: the unique
+      // index (uq_sales_shop_idempotency) rejected ours and rolled the whole
+      // transaction back (stock un-consumed) — return the winning sale.
+      if (dto.idempotencyKey && this.isUniqueViolation(err)) {
+        const existing = await this.sales.findOne({
+          where: { shopId, idempotencyKey: dto.idempotencyKey },
+        });
+        if (existing) return this.findOne(shopId, existing.id);
       }
-
-      return sale.id;
-    });
+      throw err;
+    }
 
     return this.findOne(shopId, saleId);
+  }
+
+  private isUniqueViolation(err: unknown): boolean {
+    return (
+      err instanceof QueryFailedError &&
+      (err.driverError as { code?: string })?.code === '23505'
+    );
   }
 
   /** Lock a phone, flip it to SOLD, and shape its sale-item line. */
