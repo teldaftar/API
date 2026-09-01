@@ -69,6 +69,15 @@ export class PhoneResponseDto {
   })
   debt: SaleDebtSummaryDto | null;
 
+  @ApiPropertyOptional({
+    nullable: true,
+    type: String,
+    format: 'date-time',
+    description:
+      "When the phone was sold (its latest sale's sold_at); null while IN_STOCK. Use this to group/sort sold phones by sale date.",
+  })
+  soldAt: Date | null;
+
   @ApiProperty() createdAt: Date;
   @ApiProperty() updatedAt: Date;
 
@@ -76,6 +85,7 @@ export class PhoneResponseDto {
     phone: Phone,
     salePrice: number | null = null,
     debt: SaleDebtSummaryDto | null = null,
+    soldAt: Date | null = null,
   ): PhoneResponseDto {
     return {
       id: phone.id,
@@ -102,6 +112,7 @@ export class PhoneResponseDto {
       note: phone.note,
       status: phone.status,
       debt,
+      soldAt,
       createdAt: phone.createdAt,
       updatedAt: phone.updatedAt,
     };

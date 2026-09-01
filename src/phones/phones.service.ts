@@ -37,6 +37,9 @@ import {
   PhoneUsedGrade,
 } from './entities/phone.entity';
 
+/** A phone's most recent sale: sold price, its sale id, and when it was sold. */
+type LatestSale = { unitPrice: number; saleId: string; soldAt: Date };
+
 @Injectable()
 export class PhonesService {
   constructor(
@@ -64,13 +67,14 @@ export class PhonesService {
   private async latestSaleMap(
     shopId: string,
     phoneIds: string[],
-  ): Promise<Map<string, { unitPrice: number; saleId: string }>> {
+  ): Promise<Map<string, LatestSale>> {
     if (phoneIds.length === 0) return new Map();
     const rows = await this.saleItems
       .createQueryBuilder('si')
       .select('si.phone_id', 'phone_id')
       .addSelect('si.unit_price', 'unit_price')
       .addSelect('si.sale_id', 'sale_id')
+      .addSelect('s.sold_at', 'sold_at')
       .innerJoin('sales', 's', 's.id = si.sale_id')
       .where('si.shop_id = :shopId', { shopId })
       .andWhere('si.item_type = :type', { type: SaleItemType.PHONE })
@@ -78,11 +82,20 @@ export class PhonesService {
       .distinctOn(['si.phone_id'])
       .orderBy('si.phone_id')
       .addOrderBy('s.sold_at', 'DESC')
-      .getRawMany<{ phone_id: string; unit_price: string; sale_id: string }>();
+      .getRawMany<{
+        phone_id: string;
+        unit_price: string;
+        sale_id: string;
+        sold_at: Date;
+      }>();
     return new Map(
       rows.map((r) => [
         r.phone_id,
-        { unitPrice: parseFloat(r.unit_price), saleId: r.sale_id },
+        {
+          unitPrice: parseFloat(r.unit_price),
+          saleId: r.sale_id,
+          soldAt: r.sold_at,
+        },
       ]),
     );
   }
@@ -93,7 +106,7 @@ export class PhonesService {
    */
   private async debtByPhone(
     shopId: string,
-    latestSales: Map<string, { unitPrice: number; saleId: string }>,
+    latestSales: Map<string, LatestSale>,
   ): Promise<Map<string, SaleDebtSummaryDto>> {
     const result = new Map<string, SaleDebtSummaryDto>();
     if (latestSales.size === 0) return result;
@@ -167,6 +180,7 @@ export class PhonesService {
         p,
         latestSales.get(p.id)?.unitPrice ?? null,
         debtByPhone.get(p.id) ?? null,
+        latestSales.get(p.id)?.soldAt ?? null,
       ),
     );
   }
@@ -289,13 +303,41 @@ export class PhonesService {
       });
     }
 
+    // Latest sale date per phone, as a correlated subquery — lets us filter and
+    // sort by the sale date without joining the (possibly multiple) sale rows.
+    // A resold phone takes its most recent sale (MAX). NULL for never-sold ones.
+    const latestSoldAt = `(
+      SELECT MAX(s.sold_at)
+      FROM sale_items si
+      INNER JOIN sales s ON s.id = si.sale_id
+      WHERE si.phone_id = phone.id
+        AND si.shop_id = phone.shop_id
+        AND si.item_type = :phoneItemType
+    )`;
+    const usesSoldAt =
+      !!query.soldFrom || !!query.soldTo || query.sort === 'soldAt';
+    if (usesSoldAt) {
+      qb.setParameter('phoneItemType', SaleItemType.PHONE);
+    }
+    if (query.soldFrom) {
+      qb.andWhere(`${latestSoldAt} >= :soldFrom`, {
+        soldFrom: localDateStartUtc(query.soldFrom),
+      });
+    }
+    if (query.soldTo) {
+      qb.andWhere(`${latestSoldAt} < :soldToExclusive`, {
+        soldToExclusive: localDateEndExclusiveUtc(query.soldTo),
+      });
+    }
+
     const sortColumn = {
       createdAt: 'phone.created_at',
       name: 'phone.name',
       purchasePrice: 'phone.purchase_price',
+      soldAt: latestSoldAt,
     }[query.sort ?? 'createdAt'];
 
-    qb.orderBy(sortColumn, query.order ?? 'DESC')
+    qb.orderBy(sortColumn, query.order ?? 'DESC', 'NULLS LAST')
       .skip(skipOf(query))
       .take(query.limit);
 

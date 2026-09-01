@@ -1,5 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsIn, IsOptional, IsString } from 'class-validator';
+import {
+  IsEnum,
+  IsIn,
+  IsISO8601,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { DateRangeQueryDto } from '../../common';
 import { PaginationQueryDto } from '../../common';
 import { PhoneCondition, PhoneStatus } from '../entities/phone.entity';
@@ -25,12 +31,30 @@ export class QueryPhonesDto extends IntersectionType(
   search?: string;
 
   @ApiPropertyOptional({
-    enum: ['createdAt', 'name', 'purchasePrice'],
+    example: '2026-08-01',
+    description:
+      'Sold-date range start (shop-local YYYY-MM-DD); filters by the sale date. For a single day set soldFrom = soldTo.',
+  })
+  @IsOptional()
+  @IsISO8601({ strict: false })
+  soldFrom?: string;
+
+  @ApiPropertyOptional({
+    example: '2026-08-31',
+    description:
+      'Sold-date range end (shop-local, inclusive); filters by the sale date.',
+  })
+  @IsOptional()
+  @IsISO8601({ strict: false })
+  soldTo?: string;
+
+  @ApiPropertyOptional({
+    enum: ['createdAt', 'name', 'purchasePrice', 'soldAt'],
     default: 'createdAt',
   })
   @IsOptional()
-  @IsIn(['createdAt', 'name', 'purchasePrice'])
-  sort?: 'createdAt' | 'name' | 'purchasePrice' = 'createdAt';
+  @IsIn(['createdAt', 'name', 'purchasePrice', 'soldAt'])
+  sort?: 'createdAt' | 'name' | 'purchasePrice' | 'soldAt' = 'createdAt';
 
   @ApiPropertyOptional({ enum: ['ASC', 'DESC'], default: 'DESC' })
   @IsOptional()

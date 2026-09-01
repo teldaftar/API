@@ -371,6 +371,26 @@
             }
           },
           {
+            "name": "soldFrom",
+            "required": false,
+            "in": "query",
+            "description": "Sold-date range start (shop-local YYYY-MM-DD); filters by the sale date. For a single day set soldFrom = soldTo.",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "soldTo",
+            "required": false,
+            "in": "query",
+            "description": "Sold-date range end (shop-local, inclusive); filters by the sale date.",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
             "name": "sort",
             "required": false,
             "in": "query",
@@ -380,7 +400,8 @@
               "enum": [
                 "createdAt",
                 "name",
-                "purchasePrice"
+                "purchasePrice",
+                "soldAt"
               ]
             }
           },
@@ -2847,6 +2868,12 @@
                 "$ref": "#/components/schemas/SaleDebtSummaryDto"
               }
             ]
+          },
+          "soldAt": {
+            "type": "string",
+            "nullable": true,
+            "format": "date-time",
+            "description": "When the phone was sold (its latest sale's sold_at); null while IN_STOCK. Use this to group/sort sold phones by sale date."
           },
           "createdAt": {
             "format": "date-time",
