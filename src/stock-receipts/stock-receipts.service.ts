@@ -4,6 +4,7 @@ import { Brackets, DataSource, EntityManager, In, Repository } from 'typeorm';
 import {
   BusinessException,
   ErrorCode,
+  skipOf,
   PaginatedResult,
   paginate,
   localDateStartUtc,
@@ -310,7 +311,7 @@ export class StockReceiptsService {
       });
     }
 
-    qb.orderBy('r.received_at', 'DESC').skip(query.skip).take(query.limit);
+    qb.orderBy('r.received_at', 'DESC').skip(skipOf(query)).take(query.limit);
 
     const [data, total] = await qb.getManyAndCount();
     return paginate(

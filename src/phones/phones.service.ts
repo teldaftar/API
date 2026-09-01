@@ -24,7 +24,7 @@ import {
   buildDebtSummary,
   SaleDebtSummaryDto,
 } from '../sales/dto/sale-response.dto';
-import { todayLocalDateString } from '../common';
+import { todayLocalDateString, skipOf } from '../common';
 import { UploadsService } from '../uploads/uploads.service';
 import { CreatePhoneDto } from './dto/create-phone.dto';
 import { PhoneLabelDto, PhoneResponseDto } from './dto/phone-response.dto';
@@ -296,7 +296,7 @@ export class PhonesService {
     }[query.sort ?? 'createdAt'];
 
     qb.orderBy(sortColumn, query.order ?? 'DESC')
-      .skip(query.skip)
+      .skip(skipOf(query))
       .take(query.limit);
 
     const [data, total] = await qb.getManyAndCount();

@@ -6,6 +6,7 @@ import {
   ErrorCode,
   PaginatedResult,
   paginate,
+  skipOf,
 } from '../common';
 import { UploadsService } from '../uploads/uploads.service';
 import { CreateAccessoryDto } from './dto/create-accessory.dto';
@@ -96,7 +97,7 @@ export class AccessoriesService {
       qb.andWhere('a.quantity = 0');
     }
 
-    qb.orderBy('a.created_at', 'DESC').skip(query.skip).take(query.limit);
+    qb.orderBy('a.created_at', 'DESC').skip(skipOf(query)).take(query.limit);
 
     const [data, total] = await qb.getManyAndCount();
     return paginate(data, total, query.page, query.limit);
@@ -396,7 +397,7 @@ export class AccessoriesService {
       ORDER BY agg.sold_qty DESC, a.name ASC
       LIMIT $3 OFFSET $4
       `,
-      [shopId, pattern, query.limit, query.skip, itemType],
+      [shopId, pattern, query.limit, skipOf(query), itemType],
     );
 
     const data: SoldAccessoryRowDto[] = rows.map(

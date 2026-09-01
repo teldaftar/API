@@ -23,6 +23,16 @@ export class PaginationQueryDto {
   }
 }
 
+/**
+ * Composition-safe skip. Prefer this over the `skip` getter at query sites:
+ * `IntersectionType(...)` builds a fresh class and copies fields + metadata but
+ * NOT prototype accessors, so `query.skip` is `undefined` on any DTO composed
+ * via IntersectionType — silently collapsing every page to the first one.
+ */
+export function skipOf(query: { page: number; limit: number }): number {
+  return (query.page - 1) * query.limit;
+}
+
 export interface PaginationMeta {
   page: number;
   limit: number;

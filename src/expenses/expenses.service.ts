@@ -5,6 +5,7 @@ import {
   BusinessException,
   PaginatedResult,
   paginate,
+  skipOf,
   todayLocalDateString,
 } from '../common';
 import { CreateExpenseDto } from './dto/create-expense.dto';
@@ -55,7 +56,7 @@ export class ExpensesService {
 
     qb.orderBy('e.spent_at', 'DESC')
       .addOrderBy('e.created_at', 'DESC')
-      .skip(query.skip)
+      .skip(skipOf(query))
       .take(query.limit);
 
     const [data, total] = await qb.getManyAndCount();

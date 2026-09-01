@@ -5,6 +5,7 @@ import {
   BusinessException,
   PaginatedResult,
   paginate,
+  skipOf,
   todayLocalDateString,
 } from '../common';
 import { CreateCreditorDto } from './dto/create-creditor.dto';
@@ -61,7 +62,7 @@ export class CreditorsService {
 
     qb.orderBy('c.borrowed_at', 'DESC')
       .addOrderBy('c.created_at', 'DESC')
-      .skip(query.skip)
+      .skip(skipOf(query))
       .take(query.limit);
 
     const [data, total] = await qb.getManyAndCount();

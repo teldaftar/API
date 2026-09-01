@@ -14,6 +14,7 @@ import {
   PaginatedResult,
   normalizeUzPhone,
   paginate,
+  skipOf,
   localDateStartUtc,
   localDateEndExclusiveUtc,
   todayLocalDateString,
@@ -657,7 +658,7 @@ export class SalesService {
     const total = await idQb.getCount();
     const rows = await idQb
       .orderBy('sale.sold_at', 'DESC')
-      .offset(query.skip)
+      .offset(skipOf(query))
       .limit(query.limit)
       .getRawMany<{ id: string }>();
 

@@ -6,6 +6,7 @@ import {
   ErrorCode,
   PaginatedResult,
   paginate,
+  skipOf,
   todayLocalDateString,
   localDateStartUtc,
   localDateEndExclusiveUtc,
@@ -74,7 +75,7 @@ export class DebtsService {
       });
     }
 
-    qb.orderBy('debt.due_date', 'ASC').skip(query.skip).take(query.limit);
+    qb.orderBy('debt.due_date', 'ASC').skip(skipOf(query)).take(query.limit);
 
     const [debts, total] = await qb.getManyAndCount();
     const data = await this.hydrate(shopId, debts, today);
