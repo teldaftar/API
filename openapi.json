@@ -2296,6 +2296,70 @@
           "statistics"
         ]
       }
+    },
+    "/statistics/export": {
+      "get": {
+        "operationId": "StatisticsController_export",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive start date (shop-local)",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive end date (shop-local)",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "default": "ALL",
+              "type": "string",
+              "enum": [
+                "ALL",
+                "PHONE",
+                "ACCESSORY",
+                "KEYPAD_PHONE"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Multi-sheet Excel report (sales, intake, returns, debts, expenses, stock)",
+        "tags": [
+          "statistics"
+        ]
+      }
     }
   },
   "info": {
