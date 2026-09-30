@@ -27,7 +27,7 @@ DB schema is driven by **migrations only** — `synchronize` is off. After chang
 
 - **Multi-tenant by `shop_id`.** Every domain row carries `shop_id`. The current shop is read **only** from the verified JWT via the `@CurrentShop()` decorator (`src/common/decorators/current-shop.decorator.ts`) — never from body/params. This is the tenant-isolation backbone; every query filters by `shopId`.
 - **Auth.** `register` creates a `Shop` + an `OWNER` `User` (gated by optional `INVITE_CODE`). Login uses argon2. Access JWT + rotating refresh tokens (`tokens.service.ts`). Only role today is `OWNER`.
-- **Modules** (`src/<module>/`): `auth`, `shop`, `phones`, `accessories`, `stock-receipts`, `sales`, `debts`, `expenses`, `statistics`, `uploads`. Each = controller + service + entities + dto. Wired in `app.module.ts`.
+- **Modules** (`src/<module>/`): `auth`, `shop`, `phones`, `accessories`, `stock-receipts`, `sales`, `debts`, `expenses`, `creditors`, `debt-book`, `statistics`, `uploads`. Each = controller + service + entities + dto. Wired in `app.module.ts`.
 - **Money** = Postgres `numeric(14,2)`, mapped to JS `number` via `numericTransformer` (`src/common/transformers`). Never do money math on the raw pg string.
 - **Base entities** (`src/common/entities/base.entity.ts`): `UuidEntity` (uuid PK) → `TimestampedEntity` (createdAt/updatedAt) → `SoftDeletableEntity` (+ deletedAt). Phones/accessories/expenses are soft-deletable.
 - **Timezone** is `Asia/Tashkent` (UTC+5), fixed. Date-range filters come in as `YYYY-MM-DD` local dates and are converted to UTC boundaries with `src/common/utils/tz.util.ts` (`localDateStartUtc`, `localDateEndExclusiveUtc`, etc.). Stats SQL shifts timestamps by `interval '5 hours'`.
@@ -67,6 +67,9 @@ A single sale bundles **any mix** of phones and accessories. `sales` (header: `c
 
 ### Debts
 1:1 with a sale (`debts`, unique `sale_id`). `OPEN`/`PAID`/`CANCELLED`; **OVERDUE is never stored** — computed as `OPEN AND dueDate < today`. Partial repayments recorded in `debt_payments`.
+
+### Debt book (qarz daftari)
+`debt_book_entries` — manual list of people who owe the shop, **not linked to sales** (sale debts live in `debts`). `borrowerName` + `amount` required; `phone`, `dueDate` (local date), `note` optional (`null` in PATCH clears). CRUD at `/debt-book`, search on name/phone/note, `from`/`to` filter on `createdAt`. Soft-deletable. Mirror of `creditors` (money the shop owes). Not included in stats.
 
 ### Expenses
 Flat `amount` + `note` + `spentAt` (date). Used as cash-out in stats.

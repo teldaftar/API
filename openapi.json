@@ -2198,6 +2198,227 @@
         ]
       }
     },
+    "/debt-book": {
+      "get": {
+        "operationId": "DebtBookController_findAll",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "default": 1,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20,
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/Object"
+                }
+              ]
+            }
+          },
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive start date (shop-local)",
+            "schema": {
+              "example": "2026-08-01",
+              "type": "string"
+            }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "Inclusive end date (shop-local)",
+            "schema": {
+              "example": "2026-08-31",
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Match on borrower name, phone or note",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "List debt book entries (qarz daftari)",
+        "tags": [
+          "debt-book"
+        ]
+      },
+      "post": {
+        "operationId": "DebtBookController_create",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateDebtBookEntryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DebtBookEntryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Create a debt book entry",
+        "tags": [
+          "debt-book"
+        ]
+      }
+    },
+    "/debt-book/{id}": {
+      "get": {
+        "operationId": "DebtBookController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DebtBookEntryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Get a debt book entry",
+        "tags": [
+          "debt-book"
+        ]
+      },
+      "patch": {
+        "operationId": "DebtBookController_update",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateDebtBookEntryDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DebtBookEntryResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Update a debt book entry",
+        "tags": [
+          "debt-book"
+        ]
+      },
+      "delete": {
+        "operationId": "DebtBookController_remove",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "access-token": []
+          }
+        ],
+        "summary": "Soft-delete a debt book entry",
+        "tags": [
+          "debt-book"
+        ]
+      }
+    },
     "/statistics/summary": {
       "get": {
         "operationId": "StatisticsController_summary",
@@ -4292,6 +4513,111 @@
           "dueDate": {
             "type": "string",
             "description": "Beradigan sana — due date to return"
+          }
+        }
+      },
+      "DebtBookEntryResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "borrowerName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "object",
+            "nullable": true
+          },
+          "amount": {
+            "type": "number"
+          },
+          "dueDate": {
+            "type": "object",
+            "nullable": true
+          },
+          "note": {
+            "type": "object",
+            "nullable": true
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "borrowerName",
+          "amount",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateDebtBookEntryDto": {
+        "type": "object",
+        "properties": {
+          "borrowerName": {
+            "type": "string",
+            "example": "Sardor",
+            "description": "Qarz oluvchi ismi"
+          },
+          "amount": {
+            "type": "number",
+            "example": 500000,
+            "description": "Summa"
+          },
+          "phone": {
+            "type": "object",
+            "example": "+998901234567",
+            "description": "Tel nomer — optional contact phone"
+          },
+          "dueDate": {
+            "type": "object",
+            "example": "2026-10-15",
+            "nullable": true,
+            "description": "Qaytarish sanasi (YYYY-MM-DD) — optional; null clears it"
+          },
+          "note": {
+            "type": "object",
+            "description": "Izoh — optional note"
+          }
+        },
+        "required": [
+          "borrowerName",
+          "amount"
+        ]
+      },
+      "UpdateDebtBookEntryDto": {
+        "type": "object",
+        "properties": {
+          "borrowerName": {
+            "type": "string",
+            "example": "Sardor",
+            "description": "Qarz oluvchi ismi"
+          },
+          "amount": {
+            "type": "number",
+            "example": 500000,
+            "description": "Summa"
+          },
+          "phone": {
+            "type": "object",
+            "example": "+998901234567",
+            "description": "Tel nomer — optional contact phone"
+          },
+          "dueDate": {
+            "type": "object",
+            "example": "2026-10-15",
+            "nullable": true,
+            "description": "Qaytarish sanasi (YYYY-MM-DD) — optional; null clears it"
+          },
+          "note": {
+            "type": "object",
+            "description": "Izoh — optional note"
           }
         }
       },
