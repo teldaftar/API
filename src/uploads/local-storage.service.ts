@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomBytes } from 'crypto';
-import { mkdir, unlink, writeFile } from 'fs/promises';
+import { mkdir, readdir, stat, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { StorageService, StoredFile } from './storage.service';
 
@@ -14,10 +14,7 @@ export class LocalStorageService
 
   constructor(config: ConfigService) {
     super();
-    this.dir = join(
-      process.cwd(),
-      config.getOrThrow<string>('UPLOADS_DIR'),
-    );
+    this.dir = join(process.cwd(), config.getOrThrow<string>('UPLOADS_DIR'));
   }
 
   async onModuleInit(): Promise<void> {
@@ -34,5 +31,18 @@ export class LocalStorageService
 
   async remove(key: string): Promise<void> {
     await unlink(join(this.dir, key)).catch(() => undefined);
+  }
+
+  async list(): Promise<{ key: string; modifiedAt: Date }[]> {
+    const entries = await readdir(this.dir, { withFileTypes: true });
+    const files = await Promise.all(
+      entries
+        .filter((e) => e.isFile())
+        .map(async (e) => {
+          const info = await stat(join(this.dir, e.name)).catch(() => null);
+          return info ? { key: e.name, modifiedAt: info.mtime } : null;
+        }),
+    );
+    return files.filter((f) => f !== null);
   }
 }

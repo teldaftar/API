@@ -243,6 +243,7 @@
     },
     "/uploads/image": {
       "post": {
+        "description": "Larger files → 413 `IMAGE_TOO_LARGE` with `details.maxSizeMb`.",
         "operationId": "UploadsController_uploadImage",
         "parameters": [],
         "requestBody": {
@@ -278,7 +279,7 @@
             "access-token": []
           }
         ],
-        "summary": "Upload & resize an image (jpeg|png|webp, max 2MB)",
+        "summary": "Upload & resize an image (jpeg|png|webp, max 3MB)",
         "tags": [
           "uploads"
         ]
