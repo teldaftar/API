@@ -36,6 +36,12 @@ GRANT SELECT ON ALL TABLES IN SCHEMA public TO claude_ro;
 -- Sessiya tokenlari tahlil uchun kerak emas: jadval butunlay yopiq.
 REVOKE ALL ON refresh_tokens FROM claude_ro;
 
+-- MCP OAuth: kirish tokenlari va mijoz sirlari.
+SELECT format('REVOKE ALL ON %I FROM claude_ro', tablename)
+FROM pg_tables
+WHERE schemaname = 'public' AND tablename LIKE 'mcp\_oauth\_%'
+\gexec
+
 -- `users` faqat ruxsat etilgan ustunlar orqali ochiq, `password_hash` yopiq.
 -- Yangi ustun bu ro'yxatga qo'shilmaguncha ko'rinmaydi.
 REVOKE ALL ON users FROM claude_ro;

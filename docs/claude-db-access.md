@@ -1,91 +1,69 @@
 # Claude uchun production bazani o'qish
 
-Claude Code bazaga faqat o'qiy oladigan `claude_ro` foydalanuvchisi bilan, SSH tunnel orqali ulanadi. Serverga yangi kod yoki ochiq port qo'shilmaydi.
+Claude ilovasi bazaga connector orqali ulanadi: `https://api.teldaftar.uz/mcp`. Claude bazaga faqat `claude_ro` foydalanuvchisi nomidan so'rov yuboradi va hech narsani o'zgartira olmaydi.
 
 ```text
-Claude Code -> lokal postgres-mcp -> SSH tunnel -> server Postgres (claude_ro)
+Claude -> HTTPS + OAuth -> /mcp (NestJS) -> Postgres (claude_ro)
 ```
 
-`claude_ro` barcha biznes jadvallarni o'qiydi. U `refresh_tokens` jadvalini va `users.password_hash` ustunini o'qiy olmaydi, hech narsani o'zgartira olmaydi.
+Kirish uchun alohida admin paroli ishlatiladi, do'kon loginlari ishlamaydi. Bu connector **barcha do'konlar** ma'lumotini ko'radi.
 
-## 1. Serverda portni tekshirish
+`claude_ro` `refresh_tokens`, `mcp_oauth_*` jadvallarini va `users.password_hash` ustunini o'qiy olmaydi.
+
+Uchta vosita bor: `list_tables`, `describe_table` va `query`. `query` bitta `SELECT` yoki `VALUES` so'rovini bajaradi, 15 soniyada to'xtaydi va ko'pi bilan 1000 qator qaytaradi. So'rovlar matni `pm2 logs teldaftar` da ko'rinadi, natijalari yozilmaydi.
+
+## Yoqish
+
+`.env` sozlanmaguncha `/mcp` o'chiq turadi. Serverda ilova papkasida bajaring.
+
+**1. `claude_ro` ni tayyorlash** (faqat bir marta):
 
 ```bash
-sudo ss -tlnp | grep 5432
-docker ps --filter name=shop_postgres --format '{{.Ports}}'
-```
-
-Agar `0.0.0.0:5432` ko'rinsa, Postgres internetga ochiq bo'lishi mumkin. Docker orqali ochilgan port `ufw` qoidalarini aylanib o'tishi mumkin. Bu holatda `docker-compose.yml` dagi portni shunday o'zgartiring:
-
-```yaml
-ports:
-  - '127.0.0.1:${DB_PORT:-5432}:5432'
-```
-
-So'ng `docker compose up -d postgres` bilan konteynerni qayta yarating. Ilova va tunnel `127.0.0.1` orqali ishlashda davom etadi.
-
-## 2. `claude_ro` foydalanuvchisini yaratish
-
-Skriptni superuser nomidan ishga tushiring. Avval `scripts/claude-readonly-role.sql` faylini serverga ko'chiring yoki deploy qiling.
-
-Docker bilan:
-
-```bash
-docker exec -i shop_postgres psql -U <DB_USER> -d <DB_NAME> < scripts/claude-readonly-role.sql
-docker exec -it shop_postgres psql -U <DB_USER> -d <DB_NAME> -c '\password claude_ro'
-```
-
-Docker'siz:
-
-```bash
-sudo -u postgres psql -d <DB_NAME> -f scripts/claude-readonly-role.sql
+sudo -u postgres psql -d <DB_NAME> < scripts/claude-readonly-role.sql
 sudo -u postgres psql -d <DB_NAME> -c '\password claude_ro'
 ```
 
-Parolni `openssl rand -hex 24` bilan yarating. Unda URI'ni buzadigan belgilar bo'lmaydi.
-
-Yangi jadval qo'shadigan migratsiyadan keyin skriptni qayta ishga tushiring. Yangi jadvalda maxfiy ustun bo'lsa, avval skriptda uni yoping.
-
-## 3. Kompyuterda tunnel ochish
+**2. Admin parolini yaratish.** Kamida 16 belgili yangi parol tanlang:
 
 ```bash
-ssh -N -L 15432:127.0.0.1:<DB_PORT> <user>@<server>
+read -rs -p 'Admin parol: ' P; echo
+HASH=$(printf %s "$P" | node -e "require('argon2').hash(require('fs').readFileSync(0,'utf8')).then(console.log)")
+unset P
+printf "MCP_ADMIN_PASSWORD_HASH='%s'\n" "$HASH" >> .env
+unset HASH
 ```
 
-Ishlab bo'lgach, tunnelni yoping. Tunnel yopilganda Claude bazaga ulana olmaydi.
-
-## 4. MCP'ni ulash
-
-`uv` o'rnatilgan bo'lishi kerak.
+**3. Qolgan sozlamalar:**
 
 ```bash
-read -s "PW?claude_ro paroli: "; echo
-claude mcp add prod-db --scope local --transport stdio \
-  --env DATABASE_URI="postgresql://claude_ro:$PW@localhost:15432/<DB_NAME>" \
-  -- uvx postgres-mcp==0.3.0 --access-mode=restricted
-unset PW
+read -rs -p 'claude_ro paroli: ' P; echo
+printf "MCP_PUBLIC_URL=https://api.teldaftar.uz/mcp\nMCP_DB_USER=claude_ro\nMCP_DB_PASSWORD='%s'\n" "$P" >> .env
+unset P
+pm2 reload teldaftar --update-env
 ```
 
-`--scope local` sozlamani repoga emas, shaxsiy `~/.claude.json` fayliga yozadi. Parol u yerda ochiq matn bo'lib turadi.
+**4. Tekshirish:**
 
-## 5. Tekshirish
+```bash
+curl -i https://api.teldaftar.uz/.well-known/oauth-protected-resource/mcp
+curl -i -X POST https://api.teldaftar.uz/mcp
+```
 
-Claude Code'da `/mcp` buyrug'i bilan `prod-db` ulanganini ko'ring, keyin so'rang:
+Birinchisi `200`, ikkinchisi `401` qaytarishi kerak. `404` chiqsa, `.env` va nginx'ni tekshiring: `/mcp`, `/authorize`, `/token`, `/register`, `/revoke`, `/mcp-login` va `/.well-known/` ilovaga yetib borishi kerak.
 
-- `users jadvalidan password_hash ni o'qib ko'r` — xato qaytishi kerak.
-- `shops jadvalidan do'konlar sonini ayt` — javob qaytishi kerak.
+**5. Claude'ga qo'shish:** **Customize > Connectors > Add custom connector**. URL: `https://api.teldaftar.uz/mcp`. OAuth client so'ralsa, **Register automatically** ni tanlang. Ochilgan sahifaga admin parolini kiriting.
 
 ## Kirishni bekor qilish
 
+Barcha ulanishlarni uzish:
+
 ```bash
-claude mcp remove prod-db --scope local
+sudo -u postgres psql -d <DB_NAME> -c 'DELETE FROM mcp_oauth_tokens;'
 ```
 
-Serverda:
+Admin parolini almashtirganda ham shu buyruqni bajaring: yangi parol mavjud tokenlarni bekor qilmaydi.
 
-```sql
-ALTER ROLE claude_ro NOLOGIN;
-```
+Endpoint'ni butunlay o'chirish uchun `.env` dan `MCP_*` qatorlarini olib tashlang va `pm2 reload teldaftar --update-env` qiling.
 
 ## Bazadan nimalarni bilib bo'ladi
 
@@ -137,4 +115,4 @@ SELECT pg_size_pretty(pg_total_relation_size('audit_log'));
 ## Bazadan bilib bo'lmaydigan narsalar
 
 - **Migratsiyadan oldingi o'zgarishlar:** `audit_log` faqat `AuditLog` migratsiyasi ishlagandan keyingi o'zgarishlarni yozadi.
-- **Xatolar va so'rovlar:** ular bazada emas, PM2 loglarida (`pm2 logs teldaftar`). Bu MCP loglarni o'qimaydi. Muvaffaqiyatsiz so'rov `audit_log` ga tushmaydi, chunki tranzaksiya bekor bo'ladi.
+- **Xatolar va so'rovlar:** ular bazada emas, PM2 loglarida (`pm2 logs teldaftar`). Connector loglarni o'qimaydi. Muvaffaqiyatsiz so'rov `audit_log` ga tushmaydi, chunki tranzaksiya bekor bo'ladi.

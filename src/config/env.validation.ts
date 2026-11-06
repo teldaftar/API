@@ -25,4 +25,10 @@ export const envValidationSchema = Joi.object({
 
   THROTTLE_TTL_MS: Joi.number().default(60000),
   THROTTLE_LIMIT: Joi.number().default(5),
+
+  // Remote MCP endpoint. Stays off unless the URL, hash and password are all set.
+  MCP_PUBLIC_URL: Joi.string().uri().allow(''),
+  MCP_ADMIN_PASSWORD_HASH: Joi.string().allow(''),
+  MCP_DB_USER: Joi.string().default('claude_ro'),
+  MCP_DB_PASSWORD: Joi.string().allow(''),
 });

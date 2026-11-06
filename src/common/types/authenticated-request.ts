@@ -8,6 +8,7 @@ export interface AuthContext {
   role: string;
 }
 
-export interface AuthenticatedRequest extends Request {
+// `Omit`: the MCP SDK declares its own global `Request.auth` for /mcp requests.
+export interface AuthenticatedRequest extends Omit<Request, 'auth'> {
   auth: AuthContext;
 }

@@ -4,6 +4,7 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 import { DataSource } from 'typeorm';
 import { AppModule } from '../src/app.module';
 import { AllExceptionsFilter } from '../src/common';
+import { setupMcp } from '../src/mcp/mcp.setup';
 
 export interface TestContext {
   app: INestApplication;
@@ -35,6 +36,7 @@ export async function createTestApp(): Promise<TestContext> {
     }),
   );
   app.useGlobalFilters(new AllExceptionsFilter());
+  setupMcp(app);
   await app.init();
 
   const dataSource = app.get(DataSource);

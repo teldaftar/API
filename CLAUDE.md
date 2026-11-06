@@ -75,8 +75,12 @@ A single sale bundles **any mix** of phones and accessories. `sales` (header: `c
 Flat `amount` + `note` + `spentAt` (date). Used as cash-out in stats.
 
 ### Audit log
-`audit_log` — append-only change history written by the `audit_row_change` row trigger on every business table (migration `AuditLog`), so it also covers manual SQL. UPDATE rows store only changed columns; `updated_at`-only changes are skipped. Secret columns are passed as trigger arguments and logged as `[hidden]`. There is no entity or API: it's read directly through the read-only DB access in `docs/claude-db-access.md`.
+`audit_log` — append-only change history written by the `audit_row_change` row trigger on every business table (migration `AuditLog`), so it also covers manual SQL. UPDATE rows store only changed columns; `updated_at`-only changes are skipped. Secret columns are passed as trigger arguments and logged as `[hidden]`. There is no entity or API: it's read through the remote MCP in `docs/claude-db-access.md`.
 The actor comes from `src/audit/`: a global interceptor puts `req.auth.userId` + request id into AsyncLocalStorage, and a TypeORM subscriber copies them into transaction-local settings on `afterTransactionStart`. A write outside a transaction gets no actor, so don't call bare `repo.update()/delete()` outside `dataSource.transaction` (`save()`/`softRemove()` are fine).
+
+### Remote MCP (`src/mcp/`)
+Read-only connector for Claude at `/mcp`, mounted by `setupMcp()` from `main.ts` (not a Nest module). Off unless `MCP_PUBLIC_URL`, `MCP_ADMIN_PASSWORD_HASH` and `MCP_DB_PASSWORD` are all set. It sees every shop, so sign-in is OAuth with a dedicated admin password, never a shop login. Queries run as the `claude_ro` role, which is the real security boundary. OAuth state lives in `mcp_oauth_*` (hashed codes/tokens), closed to `claude_ro`. Setup: `docs/claude-db-access.md`.
+Body parsers for these routes must stay inside an Express `Router`: Nest skips its global parsers if it finds `json()`/`urlencoded()` mounted directly on the app, which empties every API body.
 
 ### Statistics
 `summary` + `daily`, hand-written SQL grouped by shop-local day. Reports phone/accessory purchased vs sold vs returned vs in-stock, debts, expenses, and `totals` (grossProfit, netProfit, cashIn, cashOut). Accessory "purchased" reads intake layers (`accessory_stock_entries` where `sale_return_id IS NULL`); "remaining" value = Σ `remaining_quantity × purchase_price`; phone "purchased" from `phones.created_at`.

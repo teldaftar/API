@@ -6,6 +6,7 @@ import { Logger } from 'nestjs-pino';
 import { join } from 'path';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common';
+import { setupMcp } from './mcp/mcp.setup';
 import { setupSwagger } from './swagger';
 
 async function bootstrap(): Promise<void> {
@@ -54,6 +55,8 @@ async function bootstrap(): Promise<void> {
   });
 
   setupSwagger(app);
+
+  setupMcp(app);
 
   const port = config.getOrThrow<number>('PORT');
   await app.listen(port);
