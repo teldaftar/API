@@ -138,19 +138,6 @@ export class AccessoriesService {
     return saved;
   }
 
-  async remove(shopId: string, id: string): Promise<void> {
-    const accessory = await this.findOne(shopId, id);
-    const image = accessory.imageUrl;
-    if (image) {
-      accessory.imageUrl = null;
-      await this.accessories.save(accessory);
-    }
-    await this.accessories.softRemove(accessory);
-    if (image) {
-      await this.uploads.removeByUrl(image);
-    }
-  }
-
   /**
    * New intake: append a stock entry, bump the denormalized quantity, and set
    * the accessory's purchasePrice to the latest cost — all in one transaction.

@@ -307,6 +307,33 @@ describe('Shop backend (e2e)', () => {
   });
 
   // ---------------------------------------------------------------------------
+  it('has no way to delete an accessory, and its receipt stays deletable', async () => {
+    const shop = await registerShop(app, 'nodelete');
+    const accessory = await api()
+      .post('/api/accessories')
+      .set(auth(shop.accessToken))
+      .send({ name: 'Case', purchasePrice: 10, salePrice: 20, quantity: 1 })
+      .expect(201);
+    await api()
+      .delete(`/api/accessories/${accessory.body.id}`)
+      .set(auth(shop.accessToken))
+      .expect(404);
+
+    const receipt = await api()
+      .post('/api/stock-receipts')
+      .set(auth(shop.accessToken))
+      .send({
+        items: [
+          { accessoryId: accessory.body.id, quantity: 2, purchasePrice: 15 },
+        ],
+      })
+      .expect(201);
+    await api()
+      .delete(`/api/stock-receipts/${receipt.body.id}`)
+      .set(auth(shop.accessToken))
+      .expect((res) => expect(res.status).toBeLessThan(300));
+  });
+
   it('creates a phone without an IMEI', async () => {
     const a = await registerShop(app, 'noimei');
     const created = await api()

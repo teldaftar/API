@@ -1,10 +1,7 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
-  HttpCode,
-  HttpStatus,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -111,15 +108,6 @@ export class AccessoriesController {
     );
   }
 
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Soft-delete an accessory' })
-  async remove(
-    @CurrentShop() shopId: string,
-    @Param('id', ParseUUIDPipe) id: string,
-  ): Promise<void> {
-    await this.service.remove(shopId, id);
-  }
 
   @Post(':id/stock')
   @ApiOperation({ summary: 'Add stock (new intake at possibly new cost)' })

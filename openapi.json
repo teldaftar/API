@@ -916,33 +916,6 @@
         "tags": [
           "accessories"
         ]
-      },
-      "delete": {
-        "operationId": "AccessoriesController_remove",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "access-token": []
-          }
-        ],
-        "summary": "Soft-delete an accessory",
-        "tags": [
-          "accessories"
-        ]
       }
     },
     "/accessories/{id}/stock": {
