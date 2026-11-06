@@ -74,6 +74,10 @@ A single sale bundles **any mix** of phones and accessories. `sales` (header: `c
 ### Expenses
 Flat `amount` + `note` + `spentAt` (date). Used as cash-out in stats.
 
+### Audit log
+`audit_log` — append-only change history written by the `audit_row_change` row trigger on every business table (migration `AuditLog`), so it also covers manual SQL. UPDATE rows store only changed columns; `updated_at`-only changes are skipped. Secret columns are passed as trigger arguments and logged as `[hidden]`. There is no entity or API: it's read directly through the read-only DB access in `docs/claude-db-access.md`.
+The actor comes from `src/audit/`: a global interceptor puts `req.auth.userId` + request id into AsyncLocalStorage, and a TypeORM subscriber copies them into transaction-local settings on `afterTransactionStart`. A write outside a transaction gets no actor, so don't call bare `repo.update()/delete()` outside `dataSource.transaction` (`save()`/`softRemove()` are fine).
+
 ### Statistics
 `summary` + `daily`, hand-written SQL grouped by shop-local day. Reports phone/accessory purchased vs sold vs returned vs in-stock, debts, expenses, and `totals` (grossProfit, netProfit, cashIn, cashOut). Accessory "purchased" reads intake layers (`accessory_stock_entries` where `sale_return_id IS NULL`); "remaining" value = Σ `remaining_quantity × purchase_price`; phone "purchased" from `phones.created_at`.
 
@@ -81,6 +85,7 @@ Flat `amount` + `note` + `spentAt` (date). Used as cash-out in stats.
 
 - New tenant-scoped table → add `shop_id` (uuid) + an index on it; filter every query by `shopId` from `@CurrentShop()`.
 - Response shape → a dedicated `*ResponseDto` with a static `from(entity)` mapper; controllers map entities→DTOs, they don't leak entities.
+- New business table → add it to the audit trigger in a migration (see `AuditLog`), hiding any secret columns, then re-run `scripts/claude-readonly-role.sql` on the server.
 - New error case → add an `ErrorCode`, throw via `BusinessException`.
 - Mutating stock/sequence/status → transaction + pessimistic lock, mirror `accessories.service.addStock` / `sales.service`.
 - Money columns → `numeric(14,2)` + `numericTransformer`. Dates for ranges → local `YYYY-MM-DD`, convert with `tz.util`.
